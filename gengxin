@@ -1,1 +1,4019 @@
-有更新
+//"ui";
+/*
+runtime.loadJar('./jsoup-1.12.1.jar');
+importClass(org.jsoup.Jsoup);
+importClass(org.jsoup.nodes.Document);
+importClass(org.jsoup.select.Elements);
+*/
+auto.waitFor();
+importClass(android.database.sqlite.SQLiteDatabase);
+var questionCommon = require("./questionCommon.js");
+var tikuCommon = require("./tikuCommon.js");
+//var PrefCheckBox = require('./自定义配置.js');
+let storage = storages.create("form") //本地存储文件建立
+let formDefault = {//默认选择项为空
+   article: true,
+    video: true,
+    sub: false,
+   daliy: true,
+    week: false,
+    special: false,
+   compete: true,
+   challenge: true,
+   fight: true,
+    radio: true,
+    local: false,
+    share: true,
+    xfk: true,
+    zyc: 1000,
+    sxx: true,
+    xuehao: 123456,
+    jiekou: 12346,
+    bendi: 3,
+   
+}
+let form = storage.get("form", formDefault);
+
+
+
+/**
+ * @Description: Auto.js -helper (6+6)+(6+6)+(1+1+2)+6+6+1+1=42分
+ * @version: 3.1.6
+ * @Author: Ivan
+ * @Date: 2020-10-26
+ */
+
+//var aCount = 6; //文章默认学习篇数
+//var vCount = 6; //小视频默认学习个数
+var cCount = 2; //收藏+分享+评论次数
+var asub = 2;//订阅个数
+//var aTime = 62; //每篇文章学习-103秒 103*7≈720秒=12分钟
+var vTime = 15; //每个小视频学习-15秒
+var rTime = 360; //广播收听-18分钟
+//var FuncConfig;//自定义配置
+var zCount = 2;//四人赛（争上游答题）轮数
+
+var oldaquestion;//四人赛（争上游）和对战答题循环，定义旧题目对比新题目用20201022
+//var myScores = {};//分数
+//特殊题，特点：题目一样，答案不同 >>>欢迎反馈其他特殊题<<<
+var ZiXingTi = "选择词语的正确词形。"; //字形题
+var DuYinTi = "选择正确的读音。";//读音题 20201211
+var ErShiSiShi ="下列不属于二十四史的是。";//二十四史
+
+
+var commentText = ["不忘初心跟党走，青春建功新时代。", "为实现中华民族伟大复兴而不懈奋斗！", "紧跟党走，毫不动摇！",
+    "不忘初心，牢记使命！", "努力奋斗，报效祖国！"
+]; //评论内容，可自行修改，大于5个字便计分
+
+var aCatlog = "推荐" //文章学习类别，可自定义修改为“要闻”、“新思想”等
+var xCount = random(7,9);
+var lCount = 1; //挑战答题轮数
+var qCount = random(5,8); //挑战答题每轮答题数
+var rightCount = 0; //争上游正确答题记数
+var myScores = {}; //分数
+//var myDiandian = {}; //
+var idNumber = ""; 
+var customize_flag = false; //自定义运行标志
+var now = new Date();
+var xq = now.getDay();
+
+//学习功能配置
+//var FuncConfig;
+
+//功能选择记录
+var FuncList = {}; 
+
+/**
+ * @description: 延时函数
+ * @param: seconds-延迟秒数
+ * @return: null
+ */
+function delay(seconds) {
+    sleep(1000 * seconds); //sleep函数参数单位为毫秒所以乘1000
+}
+   
+/**
+ * @description: 生成从minNum到maxNum的随机数
+ * @param: minNum-较小的数
+ * @param: maxNum-较大的数
+ * @return: null
+ */
+function randomNum(minNum, maxNum) {
+    switch (arguments.length) {
+        case 1:
+            return parseInt(Math.random() * minNum + 1, 10);
+        case 2:
+            return parseInt(Math.random() * (maxNum - minNum + 1) + minNum, 10);
+        default:
+            return 0;
+    }
+} 
+
+
+/**
+@description: 回到主页
+@param: null
+@return: null
+*/
+function backMain(){
+    sleep(500);
+    while (!desc("工作").exists()) {
+        console.log("正在等待回到出主页");
+        
+        back();
+        sleep(1000);
+    }
+    console.log("已经回到主页");
+}
+function backMain1(){
+   sleep(500);
+    while (!desc("工作").exists()) {
+        console.log("正在等待回到出主页");
+        back();
+        sleep(500);
+         if (text("退出").exists()){
+                className("android.widget.Button").text("退出").findOne().click();
+                sleep(500);
+                }
+    }
+    console.log("已经回到主页");
+}
+/* *************************************************订阅功能****************************************************************/
+/**
+
+@description: 从强国号中寻找可订阅媒体
+@param: null
+@return: null
+*/
+function subQianggGuoHao(){
+
+    var subSuccess = false; //是否有订阅成功的频道，有则返回ture，无则返回false
+    if(descContains("强国号").exists()){
+        descContains("强国号").findOne().click();
+    }else if(textContains("强国号").exists()){
+        textContains("强国号").findOne().click();
+    }
+    delay(1);
+    try{
+        var listCategory;
+        if(textContains("推荐").exists()){
+            listCategory =  text("推荐").findOne().parent();
+        }
+        else if(descContains("推荐").exists()){
+            listCategory =  desc("推荐").findOne().parent();
+        }
+        listCategory.children().forEach(item=>{
+            item.click();
+            delay(1);
+            err = false
+            while (!err) {
+                var img = captureScreen()
+                
+                try {
+                    className("android.widget.ImageView").findOne().parent().parent().children().forEach(item=>{
+                        if(item.childCount()>2){
+                            var subStr = "";
+                            if(item.child(1).desc()==null || item.child(1).desc()==""){
+                                subStr = item.child(1).text().split('\n')[0];
+                            }else if(item.child(1).text()==null || item.child(1).text()==""){
+                                subStr = item.child(1).desc().split('\n')[0];
+                            }
+                            var subbounds =item.child(2).bounds()
+                            if((subbounds.top+1) >= device.height){
+                                console.log("检查区域超过了设备最大高度，暂不检测此条目")
+                            }
+                            else{
+                                if(colors.toString(images.pixel(img, subbounds.left+8, subbounds.top+1))!="#ffe32416"){
+                                    console.log("%s:订阅过了",subStr)
+                                }else{
+                                    console.log("%s:可以订阅",subStr)
+                                    item.child(2).click();
+                                    subSuccess = true;
+                                    console.log("%s:订阅成功",subStr);
+                                    asub--;
+                                    if(asub <= 0){
+                                       throw '订阅已经够了，退出订阅模块'
+                                    } 
+                                }
+
+                            }
+                            
+                            delay(0.5)
+                            
+                        }
+                    });
+                    err = !className("android.widget.ImageView").findOne().parent().parent().scrollForward();
+                    delay(1);
+                }
+                catch (e) {
+                    toast(e);
+                    err = true
+                    throw e
+                }
+            }
+            delay(0.5);
+        });
+    }
+    catch(e){
+        toast(e);
+    }
+    console.log("强国号中订阅成功.asub:%d",asub);
+    return subSuccess;
+    back();
+    sleep(1000);
+    back();
+    sleep(1000)
+}
+/**
+@description: 从地方平台中寻找可订阅媒体
+@param: null
+@return: null
+*/
+function subDiFangPingTai(){
+    var subSuccess = false; //是否有订阅成功的频道，有则返回ture，无则返回false
+
+    if(descContains("地方平台").exists()){
+        descContains("地方平台").findOne().click();
+    }else if(textContains("地方平台").exists()){
+        textContains("地方平台").findOne().click();
+    }
+    delay(2);
+    try{
+        var listCategory;
+        if(textContains("推荐").exists()){
+            listCategory =  text("推荐").findOne().parent();
+        }
+        else if(descContains("推荐").exists()){
+            listCategory =  desc("推荐").findOne().parent();
+        }
+
+        listCategory.children().forEach(item=>{
+            item.click();
+            delay(1);
+            var i = 0
+            var err = false
+            if(item.desc()=="地区" || item.text()=="地区"){
+                while(!err){
+                    //查找所有的image，并检索符合要求的条目，若image为更多按钮，则点击进入，并检索条目
+                    var imageViewList = className("android.widget.ImageView").find();
+                    for(i = 0;i < imageViewList.length;i++){
+                        if(imageViewList[i].desc()=="更多" || imageViewList[i].text()=="更多"){
+                            imageViewList[i].click();//点击进入更多页面
+                            delay(2);
+                            while (!err) {
+                                var img = captureScreen()
+                                try {
+                                    className("android.widget.ImageView").findOne().parent().parent().children().forEach(item=>{
+                                        if(item.childCount()>2){
+                                            var subStr = "";
+                                            if(item.child(1).desc()==null || item.child(1).desc()==""){
+                                                subStr = item.child(1).text().split('\n')[0];
+                                            }else if(item.child(1).text()==null || item.child(1).text()==""){
+                                                subStr = item.child(1).desc().split('\n')[0];
+                                            }
+
+                                            var subbounds =item.child(2).bounds()
+                                            if((subbounds.top+1) >= device.height){
+                                                console.log("检查区域超过了设备最大高度，暂不检测此条目")
+                                            }else{
+                                                if(colors.toString(images.pixel(img, subbounds.left+8, subbounds.top+1))!="#ffe32416"){
+                                                    console.log("%s:订阅过了",subStr)
+                                                }else{
+                                                    console.log("%s:可以订阅",subStr)
+                                                    item.child(2).click();
+                                                    subSuccess = true;
+                                                    console.log("%s:订阅成功",subStr);
+                                                    asub--;
+                                                    if(asub <= 0){
+                                                       throw '订阅已经够了，退出订阅模块'
+                                                    } 
+                                                }
+                                            }
+                                            delay(0.5)
+                                        }
+                                    });
+                                    err = !className("android.widget.ImageView").findOne().parent().parent().scrollForward();
+                                    delay(1);
+                                    //console.log(err)
+                                }
+                                catch (e) {
+                                    toast(e);
+                                    err = true
+                                    throw e
+                                }
+                            }
+                            err = false;
+                            back();
+                            delay(1);
+                            back();
+                            sleep(1000);
+    //back();
+  //  sleep(1000)
+
+                        }else if(imageViewList[i].parent().childCount()==3){
+                            //符合可订阅条件的条目
+                            var subStr = "";
+                            if(imageViewList[i].parent().child(1).desc()==null || imageViewList[i].parent().child(1).desc()==""){
+                                subStr = imageViewList[i].parent().child(1).text().split('\n')[0];
+                            }else if(imageViewList[i].parent().child(1).text()==null || imageViewList[i].parent().child(1).text()==""){
+                                subStr = imageViewList[i].parent().child(1).desc().split('\n')[0];
+                            }
+                            var subbounds =imageViewList[i].parent().child(2).bounds()
+                            if((subbounds.top+1) >= device.height){
+                                console.log("检查区域超过了设备最大高度，暂不检测此条目")
+                            }
+                            else{
+                                if(colors.toString(images.pixel(img, subbounds.left+8, subbounds.top+1))!="#ffe32416"){
+                                    console.log("%s:订阅过了",subStr)
+                                }else{
+                                    console.log("%s:可以订阅",subStr)
+                                    imageViewList[i].parent().child(2).click();
+                                    subSuccess = true;
+                                    console.log("%s:订阅成功",subStr);
+                                    asub--;
+                                    if(asub <= 0){
+                                        throw '订阅已经够了，退出订阅模块'
+                                    } 
+                                }
+                            } 
+                            delay(0.5)
+                        
+                        }else{
+                            console.log("不符合条件的条目")
+                        }
+                    }
+                    tempView = className("android.widget.ImageView").findOne()
+                    if(tempView.parent().text()==""){
+                        err = !tempView.parent().parent().parent().scrollForward();
+                    }else{
+                        err = !tempView.parent().parent().scrollForward();
+                    }
+                    delay(1);
+                }
+
+            }else{
+                while (!err) {
+                    var img = captureScreen()
+                    try {
+                        className("android.widget.ImageView").findOne().parent().parent().children().forEach(item=>{
+                            if(item.childCount()>2){
+                                var subStr = "";
+                                if(item.child(1).desc()==null || item.child(1).desc()==""){
+                                    subStr = item.child(1).text().split('\n')[0];
+                                }else if(item.child(1).text()==null || item.child(1).text()==""){
+                                    subStr = item.child(1).desc().split('\n')[0];
+                                }
+
+                                var subbounds =item.child(2).bounds()
+                                if((subbounds.top+1) >= device.height){
+                                    console.log("检查区域超过了设备最大高度，暂不检测此条目")
+                                }else{
+                                    if(colors.toString(images.pixel(img, subbounds.left+8, subbounds.top+1))!="#ffe32416"){
+                                        console.log("%s:订阅过了",subStr)
+                                    }else{
+                                        console.log("%s:可以订阅",subStr)
+                                        item.child(2).click();
+                                        subSuccess = true;
+                                        console.log("%s:订阅成功",subStr);
+                                        asub--;
+                                        if(asub <= 0){
+                                           throw '订阅已经够了，退出订阅模块'
+                                        } 
+                                    }
+                                }
+                                delay(0.5)
+                            }
+                        });
+                        err = !className("android.widget.ImageView").findOne().parent().parent().scrollForward();
+                        delay(1);
+                        //console.log(err)
+                    }
+                    catch (e) {
+                        toast(e);
+                        err = true
+                        throw e
+                    }
+                }
+            }
+            delay(0.5);
+        });
+    }
+    catch(e){
+        toast(e);
+    }
+    console.log("地方平台中订阅成功.asub:%d",asub);
+    return subSuccess;
+    back();
+    sleep(1000);
+    back();
+    sleep(1000)
+}
+/**
+@description: 从县级融媒中寻找可订阅媒体
+@param: null
+@return: null
+*/
+function subXianJiRongMei(){
+    var subSuccess = false;
+    //只处理推荐和上新（基本包含了所有）
+    if(descContains("县级融媒").exists()){
+        descContains("县级融媒").findOne().click();
+    }else if(textContains("县级融媒").exists()){
+        textContains("县级融媒").findOne().click();
+    }
+    delay(2);
+    try{
+        var listCategory;
+        if(textContains("推荐").exists()){
+            listCategory =  text("推荐").findOne().parent();
+        }
+        else if(descContains("推荐").exists()){
+            listCategory =  desc("推荐").findOne().parent();
+        }
+        listCategory.children().forEach(item=>{
+            if((item.desc()=="推荐" || item.text()=="推荐")|| (item.desc()=="上新" || item.text()=="上新")){
+                item.click();
+                delay(1);
+                err = false
+                while (!err) {
+                    var img = captureScreen()
+                    try {
+                        className("android.widget.ImageView").findOne().parent().parent().children().forEach(item=>{
+                            if(item.childCount()>2){
+                                var subStr = "";
+                                if(item.child(1).desc()==null || item.child(1).desc()==""){
+                                    subStr = item.child(1).text().split('\n')[0];
+                                }else if(item.child(1).text()==null || item.child(1).text()==""){
+                                    subStr = item.child(1).desc().split('\n')[0];
+                                }
+                                var subbounds =item.child(2).bounds()
+                                if((subbounds.top+1) >= device.height){
+                                    console.log("检查区域超过了设备最大高度，暂不检测此条目")
+                                }else{
+                                    if(colors.toString(images.pixel(img, subbounds.left+8, subbounds.top+1))!="#ffe32416"){
+                                        console.log("%s:订阅过了",subStr)
+                                    }else{
+                                        console.log("%s:可以订阅",subStr)
+                                        item.child(2).click();
+                                        subSuccess = true;
+                                        console.log("%s:订阅成功",subStr);
+                                        asub--;
+                                        if(asub <= 0){
+                                          throw '订阅已经够了，退出订阅模块'
+                                        } 
+                                    }
+                                }
+                                delay(0.5)
+
+                            }
+                        });
+                        err = !className("android.widget.ImageView").findOne().parent().parent().scrollForward();
+                        delay(1);
+                    }
+                    catch (e) {
+                        toast(e);
+                        err = true
+                        throw e
+                    }
+                }
+            }else{
+                console.log("暂不处理");
+            }
+            delay(0.5);
+        });
+    }
+    catch(e){
+        toast(e);
+    }
+    console.log("县级融媒中订阅成功.asub:%d",asub);
+    return subSuccess;
+        back();
+    sleep(1000);
+    back();
+    sleep(1000)
+}
+
+
+/**
+@description: 学习平台订阅
+@param: null
+@return: null
+*/
+function sub() {
+    var i = 0;
+    let err = false;
+    // mySubArray.splice(0,mySubArray.length); //清空订阅列表，重新读取
+    // if(text("暂无相关内容").exists()){
+    //     console.log("还没订阅过任何频道");
+    //     err = true;
+    // }
+    // while (!err) {
+    //     try {
+    //         className("android.widget.ListView").findOnce().children().forEach(item => {
+    //             if(item.className()=="android.widget.LinearLayout"){
+    //                 console.log("你已经到了我的底线了，遍历完成");
+    //                 err = true;
+    //             }else if(item.childCount()>=3){
+    //                 var name = "";
+    //                 if(item.child(1).child(0).text()==null){
+    //                     name = item.child(1).child(0).desc();
+    //                 }else if(item.child(1).child(0).desc()==null){
+    //                     name = item.child(1).child(0).text();
+    //                 }
+    //                 //let name = item.child(1).child(0).text();
+    //                 //console.log(name);
+    //                 //去重处理
+    //                 if(mySubArray.indexOf(name) < 0){
+    //                     mySubArray[i++] = name;
+    //                 }
+                    
+    //             }else{
+    //                 console.log("无效的条目，无法处理");
+    //             }
+    //             //delay(1);
+    //         });
+    //         err = !className("android.widget.ListView").findOne().scrollForward();
+    //         delay(2);
+    //     } catch (e) {
+    //         toast(e);
+    //     }
+    // }
+    // console.log(mySubArray);
+
+    //backMain(); //获取完成，回到主页
+
+    while(myScores['订阅']<2){
+        desc("工作").click();
+        delay(2);
+        text("我的").findOne().click();
+        delay(1);
+        text("订阅").findOne().click();
+        delay(1);
+        text("添加").findOne().click();
+        delay(2);
+
+        if(subQianggGuoHao()&&asub>0){
+            console.log("从强国号中订阅了");
+            back();
+            sleep(1000)
+            back();
+            sleep(1000)
+            //back()
+        }
+        // if(asub<=0){
+        //     //已经订阅够了一定数量，检查是否拿到积分
+        //     delay(1);
+        //     getScores(0);
+        //     continue;
+        // }
+        else{
+            if(subDiFangPingTai()&&asub>0){
+                console.log("从地方平台中订阅了");
+                back();
+                sleep(1000)
+                back();
+                sleep(1000)
+                //back()
+            }
+            // if(asub<=0){
+            //     //已经订阅够了一定数量，检查是否拿到积分
+            //     delay(1);
+            //     getScores(0);
+            //     continue;
+            // }
+            else{
+                console.log("没有可以拿积分的订阅了，跳过");
+                back()
+                sleep(1000)
+                back()
+                break;
+            }
+            // else{
+            //     while(subXianJiRongMei()&&asub>0){
+            //         console.log("从县级融媒中订阅了");
+            //     }
+            //     if(asub<=0){
+            //         //已经订阅够了一定数量，检查是否拿到积分
+            //         delay(1);
+            //         getScores(0);
+            //         continue;
+            //     }
+            //     console.log("没有可以拿积分的订阅了，放弃吧，老铁");
+            //     break;
+
+            // }
+        }
+        
+    }
+    //回到主页
+    backMain()
+}
+
+
+/**
+ * @description: 文章学习计时(弹窗)函数
+ * @param: n-文章标号 seconds-学习秒数
+ * @return: null
+ */
+/*function article_timing(n, seconds) {
+    seconds = randomNum(seconds - 5, seconds + 5);
+    h = device.height; //屏幕高
+    w = device.width; //屏幕宽
+    // x = w * 0.64;
+    x = (w / 5) * 3;
+    h1 = h * 0.2;
+    h2 = h * 0.85;
+    for (var i = 0; i < seconds; i++) {
+        while (!textContains("欢迎发表你的观点").exists()) //如果离开了文章界面则一直等待
+        {
+            console.error("当前已离开第" + (n + 1) + "文章界面，请重新返回文章页面...");
+            sleep(1000);
+        }
+        if (i % 5 == 0) //每5秒打印一次学习情况
+        {
+            console.info("第" + (n + 1) + "篇文章已经学习" + (i + 1) + "秒,剩余" + (seconds - i - 1) + "秒!");
+        }
+        sleep(1000);
+        if (i % 10 == 0) //每10秒滑动一次，如果android版本<7.0请将此滑动代码删除
+        {
+            toast("这是防息屏toast,请忽视-。-");
+            if (i <= seconds / 2) {
+                swipe(x, h2, x, h1, randomNum(450, 550)); //向下滑动
+                //gestures([randomNum(450,550), [x, h2], [x, h1]]);
+            } else {
+                swipe(x, h1, x, h2, randomNum(450, 550)); //向上滑动
+                //gesture(randomNum(450,550), [x, h1], [x, h2]);
+            }
+        }
+    }
+}*/
+
+/**
+ * @description: 视频学习计时(弹窗)函数
+ * @param: n-视频标号 seconds-学习秒数
+ * @return: null
+ */
+/*function video_timing_bailing(n, seconds) {
+    seconds = randomNum(seconds - 5, seconds + 5);
+    for (var i = 0; i * 5 < seconds; i++) {
+        while (!textContains("分享").exists()) //如果离开了百灵小视频界面则一直等待
+        {
+            console.error("当前已离开第" + (n + 1) + "个百灵小视频界面，请重新返回视频");
+            sleep(2000);
+        }
+        if (seconds > ((i + 1) * 5)) {
+            sleep(5000);
+            console.info("第" + (n + 1) + "个小视频已经观看" + ((i + 1) * 5) + "秒,剩余" + (seconds - (i + 1) * 5) + "秒!");
+        } else {
+            sleep((seconds - i * 5) * 1000);
+        }
+    }
+}*/
+
+/**
+ * @description: 新闻联播小视频学习计时(弹窗)函数
+ * @param: n-视频标号 seconds-学习秒数
+ * @return: null
+ */
+function video_timing_news(n, seconds) {
+    seconds = randomNum(seconds - 1, seconds + 5);
+    for (var i = 0; i * 5 < seconds; i++) {
+        while (!textContains("欢迎发表你的观点").exists()) //如果离开了联播小视频界面则一直等待
+        {
+            console.error("当前已离开第" + (n + 1) + "个新闻视频界面，请重新返回视频");
+            sleep(2000);
+        }
+        if (seconds > ((i + 1) * 5)) {
+            sleep(5000);
+            /*var targetrect = className("android.widget.ImageView").findOne().bounds();
+            if(className("android.view.View").text("点赞").exists()){
+            className("android.view.View").text("点赞").findOne().click()
+              }
+             else
+            {click(targetrect.centerX(),targetrect.centerY());}*/
+            console.info("第" + (n + 1) + "个新闻视频已经观看" + ((i + 1) * 5) + "秒,剩余" + (seconds - (i + 1) * 5) + "秒!");
+        } else {
+            sleep((seconds - i * 5) * 1000);
+        }
+    }
+}
+
+/**
+ * @description: 广播学习计时(弹窗)函数
+ * @param: r_time-已经收听的时间 seconds-学习秒数
+ * @return: null
+ */
+function radio_timing(r_time, seconds) {
+    for (var i = 0; i < seconds; i++) {
+        sleep(1000);
+        if (i % 5 == 0) //每5秒打印一次信息
+        {
+            console.info("广播已经收听" + (i + 1 + r_time) + "秒,剩余" + (seconds - i - 1) + "秒!");
+        }
+        if (i % 10 == 0) //每15秒弹一次窗防止息屏
+        {
+            toast("这是防息屏toast,请忽视-。-");
+        }
+    }
+}
+
+/**
+ * @description: 日期转字符串函数
+ * @param: y,m,d 日期数字 2019 1 1
+ * @return: s 日期字符串 "2019-xx-xx"
+ */
+function dateToString(y, m, d) {
+    var year = y.toString();
+    if ((m + 1) < 10) {
+        var month = "0" + (m + 1).toString();
+    } else {
+        var month = (m + 1).toString();
+    }
+    if (d < 10) {
+        var day = "0" + d.toString();
+    } else {
+        var day = d.toString();
+    }
+    var s = year + "-" + month + "-" + day; //年-月-日
+    return s;
+}
+
+/**
+ * @description: 获取当天日期字符串函数
+ * @param: null
+ * @return: s 日期字符串 "2019-xx-xx"
+ */
+function getTodayDateString() {
+    var date = new Date();
+    var y = date.getFullYear();
+    var m = date.getMonth();
+    var d = date.getDate();
+
+    var s = dateToString(y, m, d); //年-月-日
+    return s
+}
+
+/**
+ * @description: 获取昨天日期字符串函数
+ * @param: null
+ * @return: s 日期字符串 "2019-xx-xx"
+ */
+function getYestardayDateString() {
+    var date = new Date();
+    date.setDate(date.getDate() - 1);
+    var y = date.getFullYear();
+    var m = date.getMonth();
+    var d = date.getDate();
+    var s = dateToString(y, m, d); //年-月-日
+    return s
+}
+
+/**
+ * @description: 获取一周前日期字符串函数
+ * @param: null
+ * @return: s 日期字符串 "2019-xx-xx"
+ */
+function getLastweekDateString() {
+    var date = new Date();
+    date.setDate(date.getDate() - 7);
+    var y = date.getFullYear();
+    var m = date.getMonth();
+    var d = date.getDate();
+    var s = dateToString(y, m, d); //年-月-日
+    return s
+}
+
+/**
+ * @description: 增加或更新数据库
+ * @param: title,idNumber,date
+ * @return: res
+ */
+function getLearnedArticle(title, idnumber) {
+    var dbName = "tiku.db";
+    //文件路径
+    var path = files.path(dbName);
+    //确保文件存在
+    if (!files.exists(path)) {
+        // files.createWithDirs(path);
+        console.error("未找到题库!请将题库放置与js同一目录下");
+    }
+    //创建或打开数据库
+    var db = SQLiteDatabase.openOrCreateDatabase(path, null);
+    var createTable = "\
+    CREATE TABLE IF NOt EXISTS learnedArticles(\
+    title CHAR(500),\
+    id_number CHAR(15),\
+    date_string CHAR(15)\
+    );";
+    // var cleanTable = "DELETE FROM tikuNet";
+    db.execSQL(createTable);
+    // db.execSQL(cleanTable);
+    var sql = "SELECT * FROM  learnedArticles WHERE title = '" + title + "' AND id_number = '" + idnumber + "'";
+    var cursor = db.rawQuery(sql, null);
+    var res = cursor.moveToFirst();
+    cursor.close();
+    // console.warn("查询结果:",res);
+    db.close();
+    return res;
+}
+
+function insertLearnedArticle(title, idnumber, date_string) {
+    var dbName = "tiku.db";
+    var path = files.path(dbName);
+    if (!files.exists(path)) {
+        //files.createWithDirs(path);
+        console.error("未找到题库!请将题库放置与js同一目录下");
+    }
+    var db = SQLiteDatabase.openOrCreateDatabase(path, null);
+    var createTable = "\
+    CREATE TABLE IF NOt EXISTS learnedArticles(\
+    title CHAR(253),\
+    id_number CHAR(15),\
+    date_string CHAR(15)\
+    );";
+    // var cleanTable = "DELETE FROM tikuNet";
+    db.execSQL(createTable);
+    var sql = "INSERT INTO learnedArticles VALUES ('" + title + "','" + idnumber + "','" + date_string + "')";
+    db.execSQL(sql);
+
+    var sql = "SELECT COUNT(*) FROM learnedArticles WHERE id_number = '" + idNumber + "';";
+    var cursor = db.rawQuery(sql, null);
+    cursor.moveToFirst();
+    let sCount = cursor.getLong(0);
+    console.warn("插入已学表中，共", sCount, "条");
+    db.close();
+}
+
+function cleanLearnedArticle(date_string) {
+    var dbName = "tiku.db";
+    var path = files.path(dbName);
+    if (!files.exists(path)) {
+        //files.createWithDirs(path);
+        console.error("未找到题库!请将题库放置与js同一目录下");
+    }
+    var db = SQLiteDatabase.openOrCreateDatabase(path, null);
+    var createTable = "\
+    CREATE TABLE IF NOt EXISTS learnedArticles(\
+    id_number CHAR(15),\
+    date_string CHAR(15)\
+    );";
+    // var cleanTable = "DELETE FROM tikuNet";
+    db.execSQL(createTable);
+    /*
+    var deleteTable = "DROP TABLE learnedArticles;";
+    try {
+        db.execSQL(deleteTable);
+        console.info("删除表");
+    } catch(e) {
+        console.error(e);
+    }
+    */
+    var cleanTable = "\
+    DELETE FROM learnedArticles WHERE date_string < '" + date_string + "'\
+    ;";
+    // var cleanTable = "DELETE FROM tikuNet";
+    try {
+        db.execSQL(cleanTable);
+        console.info("清空表");
+    } catch (e) {
+        console.error(e);
+    }
+
+    db.close();
+}
+
+/**
+ * @description: 文章学习函数  (阅读文章+文章学习时长)---6+6=12分
+ * @param: null
+ * @return: null
+ */
+function articleStudyold() {
+    while (!desc("工作").exists()); //等待加载出主页
+    id("home_bottom_tab_icon_large").click(); //点击主页正下方的"学习"按钮
+    sleep(2000);
+    click(aCatlog);
+    sleep(2000);
+    let listView = className("ListView"); //获取文章ListView控件用于翻页
+    var zt_flag = false; //判断进入专题界面标志
+    var fail = 0; //点击失败次数
+    var date_string = getTodayDateString(); //获取当天日期字符串
+    for (var i = 0, t = 0; i < aCount;) {
+        if (click(date_string, t) == true) { //如果点击成功则进入文章页面,不成功意味着本页已经到底,要翻页
+            sleep(5000);
+            // // sleep(10000); //等待加载出文章页面，后面判断是否进入了视频文章播放要用到
+            //获取当前正在阅读的文章标题
+            var currentNewsTitle = ""
+            if (textContains("来源").exists()) { // 有时无法获取到 来源
+                currentNewsTitle = textContains("来源").findOne().parent().children()[0].text();
+            } else if (textContains("作者").exists()) {
+                currentNewsTitle = textContains("作者").findOne().parent().children()[0].text();
+            } else if (descContains("来源").exists()) {
+                currentNewsTitle = descContains("来源").findOne().parent().children()[0].desc();
+            } else if (descContains("作者").exists()) {
+                currentNewsTitle = descContains("作者").findOne().parent().children()[0].desc();
+            } else {
+                console.log("无法定位文章标题,即将退出并阅读下一篇")
+                t++;
+                back();
+                sleep(2000);
+                continue;
+            }
+            if (currentNewsTitle == "") {
+                console.log("标题为空,即将退出并阅读下一篇")
+                t++;
+                back();
+                sleep(2000);
+                continue;
+            }
+            var flag = getLearnedArticle(currentNewsTitle, date_string);
+            if (flag) {
+                //已经存在，表明阅读过了
+                console.info("该文章已经阅读过，即将退出并阅读下一篇");
+                t++;
+                back();
+                sleep(2000);
+                continue;
+            } else {
+                //没阅读过，添加到数据库
+                insertLearnedArticle(currentNewsTitle, date_string);
+            }
+            let n = 0;
+            while (!textContains("欢迎发表你的观点").exists()) { //如果没有找到评论框则认为没有进入文章界面，一直等待
+                sleep(2000);
+                console.warn("正在等待加载文章界面...");
+                if (n > 3) { //等待超过3秒则认为进入了专题界面，退出进下一篇文章
+                    console.warn("没找到评论框!该界面非文章界面!");
+                    zt_flag = true;
+                    break;
+                }
+                n++;
+            }
+            if (desc("展开").exists()) { //如果存在“展开”则认为进入了文章栏中的视频界面需退出
+                console.warn("进入了视频界面，即将退出并进下一篇文章!");
+                t++;
+                back();
+                sleep(2000);
+                if (myScores['视听学习时长'] != 6) {
+                    click("电台");
+                    sleep(1000);
+                    click("最近收听");
+                    console.log("因为广播被打断，正在重新收听广播...");
+                    sleep(2000);
+                    back();
+                }
+                while (!desc("工作").exists());
+                id("home_bottom_tab_icon_large").click();
+                sleep(2000);
+                continue;
+            }
+            if (zt_flag == true) { //进入专题页标志
+                console.warn("进入了专题界面，即将退出并进下一篇文章!");
+                t++;
+                back();
+                sleep(2000);
+                zt_flag = false;
+                continue;
+            }
+            console.log("正在学习第" + (i + 1) + "篇文章,标题：", currentNewsTitle);
+            fail = 0; //失败次数清0
+            //开始循环进行文章学习
+            article_timing(i, aTime);
+            if ((i < cCount)) //收藏分享2篇文章
+            {
+                CollectAndShare(i); //收藏+分享 若c运行到此报错请注释本行！
+            }
+            if (i < cCount) //收藏分享2篇文章
+            {
+                Comment(i); //评论
+            }
+            sleep(2000);
+            back(); //返回主界面
+            while (!desc("工作").exists()); //等待加载出主页
+            sleep(2000);
+            i++;
+            t++; //t为实际点击的文章控件在当前布局中的标号,和i不同,勿改动!
+        } else {
+            // if (i == 0){//如果第一次点击就没点击成功则认为首页无当天文章
+            //     date_string = getYestardayDateString();
+            //     console.warn("首页没有找到当天文章，即将学习昨日新闻!");
+            //     continue;
+            // }
+            if (fail >= aCount) { //连续翻几页没有点击成功则认为今天的新闻还没出来，学习昨天的
+                date_string = getYestardayDateString();
+                console.warn("没有找到当天文章，即将学习昨日新闻!");
+                click("综合");
+                sleep(1000);
+                listView = className("ListView"); //获取文章ListView控件用于翻页
+                continue;
+            }
+            if (!textContains(date_string).exists()) { //当前页面当天新闻
+                fail++; //失败次数加一
+            }
+            listView.scrollForward(); //向下滑动(翻页)
+            t = 0;
+            sleep(2000);
+        }
+    }
+}
+
+/**
+ * @description: 文章学习函数  (阅读文章+文章学习时长)---6+6=12分
+ * @param: null
+ * @return: null
+ */
+function articleStudy() {
+    /* h = device.height; //屏幕高
+    w = device.width; //屏幕宽
+    x = (w / 3) * 2;
+    h1 = (h / 6) * 5;
+    h2 = (h / 6); */
+    console.log("开始文章学习");
+    while (!desc("工作").exists()); //等待加载出主页
+    if (id("home_bottom_tab_icon_large").exists()) {
+        console.log("在主页面");
+    } else {
+        console.log("没找到学习按键");
+    }
+    desc("工作").click(); //点击主页正下方的"学习"按钮
+    sleep(2000);
+    click(aCatlog);
+    sleep(2000);
+    let listView = className("android.widget.ListView"); //获取文章ListView控件用于翻页
+    // var zt_flag = false; //判断进入专题界面标志
+    // var fail = 0; //点击失败次数
+    // var date_string = getTodayDateString(); //获取当天日期字符串
+
+    for (let i = 0; i < aCount;) {
+        //var idGroup = id("general_card_title_id").find();
+        //let stBobao = text("播报").find();
+        let stBobao = className("android.widget.TextView").text("播报").find();
+        //let stBobao = listView.scrollable(true).depth(20).findOnce();
+        //let aLength = idGroup.length;
+        let aLength = stBobao.length;
+        //console.log(aLength);
+
+        for (let j = 0; j < aLength; j++) {
+            try {
+                // var currentNewsTitle = stBobao[j].parent().parent().parent().child(0).text();
+                if  (stBobao[j].parent().parent().parent().parent().clickable()) {
+                    var currentNewsTitle = stBobao[j].parent().parent().parent().child(0).text();
+                } else if (stBobao[j].parent().parent().parent().parent().parent().clickable()){
+                    var currentNewsTitle = stBobao[j].parent().parent().parent().parent().child(0).text();
+                }
+
+                //console.log(currentNewsTitle);
+                let flag = getLearnedArticle(currentNewsTitle, idNumber);
+                if (flag) {
+                    //已经存在，表明阅读过了
+                    console.info("该文章已经阅读过，即将退出并阅读下一篇");
+                    //t++;
+                    //back();
+                    sleep(2000);
+                    continue;
+                } else {
+                    var hasClicked = false;
+                    if  (stBobao[j].parent().parent().parent().parent().clickable()) {
+                        hasClicked = stBobao[j].parent().parent().parent().parent().click();
+                    } else if (stBobao[j].parent().parent().parent().parent().parent().clickable()){
+                        hasClicked = stBobao[j].parent().parent().parent().parent().parent().click();
+                    }
+                    if (hasClicked) {
+                        let arTime = new Date().getTime(); //文章学习开始时间
+                        sleep(1000);
+                        if (text("内容已下线").exists()) {
+                            continue;
+                        }
+                        //没阅读过，添加到数据库
+                        insertLearnedArticle(currentNewsTitle, idNumber, date_string);
+                        // while (!textContains("欢迎发表你的观点").exists());
+                        // sleep(1000);
+                        /* let n = 0;
+                        while (!textContains("欢迎发表你的观点").exists()) { //如果没有找到评论框则认为没有进入文章界面，一直等待
+                            sleep(2000);
+                            console.warn("正在等待加载文章界面...");
+                            if (n > 3) { //等待超过3秒则认为进入了专题界面，退出进下一篇文章
+                                console.warn("没找到评论框!该界面非文章界面!");
+                                zt_flag = true;
+                                break;
+                            }
+                            n++;
+                        }
+                        if (text("展开").exists()) { //如果存在“展开”则认为进入了文章栏中的视频界面需退出
+                            console.warn("进入了视频界面，即将退出并进下一篇文章!");
+                            //t++;
+                            back();
+                            sleep(2000);
+                            if (myScores['视听学习时长'] != 6) {
+                                click("电台");
+                                sleep(1000);
+                                click("最近收听");
+                                console.log("因为广播被打断，正在重新收听广播...");
+                                sleep(2000);
+                                back();
+                            }
+                            while (!desc("学习").exists());
+                            desc("学习").click();
+                            sleep(2000);
+                            continue;
+                        }
+                        if (zt_flag == true) { //进入专题页标志
+                            console.warn("进入了专题界面，即将退出并进下一篇文章!");
+                            //t++;
+                            back();
+                            sleep(2000);
+                            zt_flag = false;
+                            continue;
+                        } */
+                        console.log("正在学习第" + (i + 1) + "篇文章,标题：", currentNewsTitle);
+                        fail = 0; //失败次数清0
+                        //开始循环进行文章学习
+                        article_timing(i, aTime);
+                        let arEnd = new Date().getTime(); //文章学习结束时间
+                        console.log("文章学习了：", (arEnd - arTime) / 1000, "秒");
+                        // console.log("此文章学习结束");
+                        if ((i < cCount)) //收藏分享2篇文章
+                        {
+                            CollectAndShare(i); //收藏+分享 若c运行到此报错请注释本行！
+                        }
+                        if (((i+1) < cCount)) //收藏分享2篇文章
+                        {
+                            Comment(i); //评论
+                        }
+                        //sleep(2000);
+                        /* back(); //返回主界面
+                        while (!desc("工作").exists()); //等待加载出主页 */
+                        while (!desc("工作").exists()) {
+                            //console.log("正在等待加载出主页");
+                            back(); //返回联播频道界面
+                            sleep(1000);
+                        }
+                        //sleep(2000);
+                        i++;
+
+                        //t++;//t为实际点击的文章控件在当前布局中的标号,和i不同,勿改动!
+                    } else {
+                        /* if (i == 0){//如果第一次点击就没点击成功则认为首页无当天文章
+                            date_string = getYestardayDateString();
+                            console.warn("首页没有找到当天文章，即将学习昨日新闻!");
+                            continue;
+                        }
+                        if (fail >= aCount) { //连续翻几页没有点击成功则认为今天的新闻还没出来，学习昨天的
+                            date_string = getYestardayDateString();
+                            console.warn("没有找到当天文章，即将学习昨日新闻!");
+                            click("综合");
+                            sleep(2000);
+                            listView = className("ListView"); //获取文章ListView控件用于翻页
+                            continue;
+                        }
+                        if (!textContains(date_string).exists()) { //当前页面当天新闻
+                            fail++; //失败次数加一
+                        } */
+                        //sleep(2000);
+                        //i++
+                        back();
+                    }
+                }
+                //如果超过阅读数量，中断循环
+                if (i >= aCount) {
+                    break;
+                }
+            } catch (e) {
+                console.log(e);
+                while (!desc("工作").exists()) {
+                    //console.log("正在等待加载出主页");
+                    back();
+                    sleep(1000);
+                }
+                //try {
+                //var currentNewsTitle = stBobao[j].parent().parent().parent().parent().parent().child(0).child(0).text();
+                //}
+            }
+        }
+        //listView = ss[0].parent().parent(); //获取文章ListView控件用于翻页
+        listView.scrollForward(); //向下滑动(翻页)
+        console.log("listView滑动");
+        //swipe(x, h1, x, h2, 500);
+        //console.log("滑动");
+        sleep(100);
+    }
+    /*
+    for (var i = 0, t = 0; i < aCount;) {
+        if (click(date_string, t) == true) //如果点击成功则进入文章页面,不成功意味着本页已经到底,要翻页
+        {
+            let n = 0;
+            while (!textContains("欢迎发表你的观点").exists()) //如果没有找到评论框则认为没有进入文章界面，一直等待
+            {
+                sleep(1000);
+                console.warn("正在等待加载文章界面...");
+                if (n > 3) //等待超过3秒则认为进入了专题界面，退出进下一篇文章
+                {
+                    console.warn("没找到评论框!该界面非文章界面!");
+                    zt_flag = true;
+                    break;
+                }
+                n++;
+            }
+            if (text("展开").exists()) //如果存在“展开”则认为进入了文章栏中的视频界面需退出
+            {
+                console.warn("进入了视频界面，退出并进下一篇文章!");
+                t++;
+                back();
+                while (!desc("学习").exists());
+                sleep(500);
+                click("电台");
+                sleep(1000);
+                click("最近收听");
+                console.log("因为广播被打断，重新收听广播...");
+                sleep(1000);
+                if (!desc("学习").exists()){
+                    back();
+                }
+                while (!desc("学习").exists());
+                desc("学习").click();
+                sleep(1000);
+                click(aCatlog);
+                sleep(1000);
+                continue;
+            }
+            if (zt_flag == true) //进入专题页标志
+            {
+                console.warn("进入了专题界面，退出并进下一篇文章!")
+                t++;
+                back();
+                sleep(1000);
+                zt_flag = false;
+                continue;
+            }
+            console.log("正在学习第" + (i + 1) + "篇文章...");
+            try
+            {
+                title = textContains("来源").findOne().parent().child(0).text();
+                console.log(title);
+            }catch(e){
+                console.warn(e);
+            }
+            fail = 0; //失败次数清0
+            article_timing(i, aTime);
+            if ((i < (myScores["收藏"]-1)) || (i < (myScores["分享"]-1))) //收藏分享2篇文章
+            {
+                CollectAndShare(i); //收藏+分享 若c运行到此报错请注释本行！
+            }
+            if (i < (myScores["发表观点"]-1)) //收藏分享2篇文章
+            {
+                Comment(i); //评论
+            }
+            back(); //返回主界面
+            while (!desc("学习").exists()); //等待加载出主页
+            sleep(1000);
+            i++;
+            t++; //t为实际点击的文章控件在当前布局中的标号,和i不同,勿改动!
+        } else {
+            if (i == 0) //如果第一次点击就没点击成功则认为首页无当天文章
+            {
+                date_string = getYestardayDateString();
+                console.warn("首页没有找到当天文章，即将学习昨日新闻!");
+                continue;
+            }
+            if (fail > 3) //连续翻几页没有点击成功则认为今天的新闻还没出来，学习昨天的
+            {
+                date_string = getYestardayDateString();
+                console.warn("没有找到当天文章，即将学习昨日新闻!");
+                click("综合");
+                sleep(1000);
+                continue;
+            }
+            if (!textContains(date_string).exists()) //当前页面当天新闻
+            {
+                fail++; //失败次数加一
+            }
+            listView.scrollForward(); //向下滑动(翻页)
+            t = 0;
+            sleep(1500);
+        }
+    }*/
+}
+function articleStudy1() {
+    /* h = device.height; //屏幕高
+    w = device.width; //屏幕宽
+    x = (w / 3) * 2;
+    h1 = (h / 6) * 5;
+    h2 = (h / 6); */
+    console.log("开始文章学习");
+    while (!desc("工作").exists()); //等待加载出主页
+    if (id("home_bottom_tab_icon_large").exists()) {
+        console.log("在主页面");
+    } else {
+        console.log("没找到学习按键");
+    }
+    desc("工作").click(); //点击主页正下方的"学习"按钮
+    sleep(2000);
+    click("综合");
+    sleep(5000);
+    if(id("v_play").exists()){
+      back();
+  
+}
+   let listView = className("android.widget.ListView"); //获取文章ListView控件用于翻页
+    // var zt_flag = false; //判断进入专题界面标志
+    // var fail = 0; //点击失败次数
+    // var date_string = getTodayDateString(); //获取当天日期字符串
+    sleep(1000);
+
+    for (let i = 0; i < 1;) {
+        //var idGroup = id("general_card_title_id").find();
+        //let stBobao = text("播报").find();
+        let stBobao = className("android.widget.TextView").text("播报").find();
+        //let stBobao = listView.scrollable(true).depth(20).findOnce();
+        //let aLength = idGroup.length;
+        let aLength = stBobao.length;
+        //console.log(aLength);
+
+        for (let j = 0; j < aLength; j++) {
+            try {
+                // var currentNewsTitle = stBobao[j].parent().parent().parent().child(0).text();
+                if  (stBobao[j].parent().parent().parent().parent().clickable()) {
+                    var currentNewsTitle = stBobao[j].parent().parent().parent().child(0).text();
+                } else if (stBobao[j].parent().parent().parent().parent().parent().clickable()){
+                    var currentNewsTitle = stBobao[j].parent().parent().parent().parent().child(0).text();
+                }
+
+                //console.log(currentNewsTitle);
+                let flag = getLearnedArticle(currentNewsTitle, idNumber);
+                if (flag) {
+                    //已经存在，表明阅读过了
+                    console.info("该文章已经阅读过，即将退出并阅读下一篇");
+                    //t++;
+                    //back();
+                    sleep(2000);
+                    continue;
+                } else {
+                    var hasClicked = false;
+                    if  (stBobao[j].parent().parent().parent().parent().clickable()) {
+                        hasClicked = stBobao[j].parent().parent().parent().parent().click();
+                    } else if (stBobao[j].parent().parent().parent().parent().parent().clickable()){
+                        hasClicked = stBobao[j].parent().parent().parent().parent().parent().click();
+                    }
+                    if (hasClicked) {
+                       // let arTime = new Date().getTime(); //文章学习开始时间
+                        sleep(1000);
+                        if (text("内容已下线").exists()) {
+                            continue;
+                        }
+                        //没阅读过，添加到数据库
+                        insertLearnedArticle(currentNewsTitle, idNumber, date_string);
+                     console.log("正在学习第" + (i + 1) + "篇文章,标题：", currentNewsTitle);
+                        fail = 0; //失败次数清0
+                        //开始循环进行文章学习
+                        article_timing(i, aTime1);
+                       // let arEnd = new Date().getTime(); //文章学习结束时间
+                       // console.log("文章学习了：", (arEnd - arTime) / 1000, "秒");
+                        // console.log("此文章学习结束");
+                                              while (!desc("工作").exists()) {
+                            //console.log("正在等待加载出主页");
+                            back(); //返回联播频道界面
+                            sleep(1000);
+                        }
+                        //sleep(2000);
+                        i++;
+
+                        //t++;//t为实际点击的文章控件在当前布局中的标号,和i不同,勿改动!
+                    } else {
+                        back();
+                    }
+                }
+                //如果超过阅读数量，中断循环
+                if (i >= 1) {
+                    break;
+                }
+            } catch (e) {
+                console.log(e);
+                while (!desc("工作").exists()) {
+                    //console.log("正在等待加载出主页");
+                    back();
+                    sleep(1000);
+                }
+                
+            }
+        }
+        //listView = ss[0].parent().parent(); //获取文章ListView控件用于翻页
+        listView.scrollForward(); //向下滑动(翻页)
+        console.log("listView滑动");
+        //swipe(x, h1, x, h2, 500);
+        //console.log("滑动");
+        sleep(100);
+    }
+    
+}
+
+
+/**
+ * @description: “百灵”小视频学习函数
+ * @param: vCount,vTime
+ * @return: null
+ */
+function videoStudy_bailing(vCount, vTime) {
+    h = device.height; //屏幕高
+    w = device.width; //屏幕宽
+    x = (w / 5) * 3; //横坐标2分之3处
+    h1 = (h / 6) * 5; //纵坐标6分之5处
+    h2 = (h / 6); //纵坐标6分之1处
+    click("百灵");
+    sleep(2000);
+    var items = ["竖", "炫", "窗", "藏", "靓", "秀", "美食", "推荐"];
+    let randomItem = items[Math.floor(Math.random() * items.length)];
+    click(randomItem);
+    sleep(3000);
+    // var a = className("FrameLayout").depth(23).findOnce(0); //根据控件搜索视频框，但部分手机不适配，改用下面坐标点击
+    // a.click();
+    //根据控件搜索视频框，但部分手机不适配，改用下面坐标点击
+    if (!className("android.widget.ImageView").depth(26).findOnce().parent().parent().click()) {
+        click((w/2)+random()*10,h/4);//坐标点击第一个视频
+    }
+    sleep(1000);
+    for (var i = 0; i < vCount; i++) {
+        console.log("正在观看第" + (i + 1) + "个小视频");
+        video_timing_bailing(i, vTime); //观看每个小视频
+        if (i != vCount - 1) {
+            swipe(x, h1, x, h2, 500); //往下翻（纵坐标从5/6处滑到1/6处）
+        }
+    }
+    back();
+    sleep(2000);
+}
+function bailing() {
+    
+    h = device.height; //屏幕高
+    w = device.width; //屏幕宽
+   
+    click("百灵");
+    sleep(1000);
+    click("百灵");
+    console.info("视频数目"+xCount+"个");
+    sleep(2000);
+    // var a = className("FrameLayout").depth(23).findOnce(0); //根据控件搜索视频框，但部分手机不适配，改用下面坐标点击
+    // a
+     click((w/2)+random()*10,h/4);//坐标点击第一个视频
+     console.info("正在观看第1个小视频");
+    
+    sleep(random(8,11)*1000);
+    swipe(random(900,1000), random(600,700), random(900,1000), random(200,250), random(300,320)); 
+    sleep(1000);
+  for (var i = 1; i < xCount; i++) {
+        console.info("正在观看第" + (i + 1) + "个小视频");
+        sleep(random(8,10)*1000);
+       // swipe(600, 1900, 580, 1000, 300); //往下翻（纵坐标从5/6处滑到1/6处）
+       swipe(random(900,950), random(600,700), random(900,950), random(200,250), random(300,320)); 
+        sleep(1000);
+        }
+     back();
+     
+    sleep(1000);
+    desc("工作").click(); 
+    
+}
+
+/**
+ * @description:新闻联播小视频学习函数
+ * @param: null
+ * @return: null
+ */
+function videoStudy_news() {
+    h = device.height; //屏幕高
+    w = device.width; //屏幕宽
+    x = (w / 5) * 3;
+    h1 = h * 0.2;
+    h2 = h * 0.85;
+    while (!desc("工作").exists());
+    //console.log('电视台')
+    desc("电视台").click();
+    //back();
+    console.log('开始视频学习...');
+    sleep(1000)
+    //console.log('联播')
+    click("联播频道");
+    sleep(2000);
+    let listView = className("ListView"); //获取listView视频列表控件用于翻页
+    let s = "中央广播电视总台";
+    if (!textContains("中央广播电视总台")) {
+        s = "央视网";
+    }
+
+    var date_string = getTodayDateString(); //获取当天日期字符串
+    //sleep(15000);
+    let scrollCount = 0;
+    for (var i = 0; i < vCount;) {
+        let stLianbo = text(s).find();
+        for (let j = 0; j < (stLianbo.length - 1); j++) {
+            let currentNewsTitle = stLianbo[j].parent().parent().parent().child(0).text();
+            let currentDate = stLianbo[j].parent().child(1).text();
+            // console.log(currentDate);
+            let flag = getLearnedArticle(currentNewsTitle + currentDate, idNumber);
+            if (flag) {
+                //已经存在，表明阅读过了
+                console.info("该视频已经看过，即将退出并看下一个");
+                //t++;
+                //back();
+                sleep(2000);
+                continue;
+            } else {
+                // if (stLianbo[j].parent().parent().parent().parent().click()) {
+                if (click(currentNewsTitle)) {
+                    //没阅读过，添加到数据库
+                    insertLearnedArticle(currentNewsTitle + currentDate, idNumber, date_string);
+                    while (!textContains("欢迎发表你的观点").exists());
+                    sleep(2000);
+                   // className("android.view.View").text("点赞").findOne().click();
+                    console.log("即将学习第" + (i + 1) + "个视频！标题：", currentNewsTitle);
+                    video_timing_news(i, vTime); //学习每个新闻联播小片段
+                    /* back(); //返回联播频道界面
+                    while (!desc("").exists()); //等待加载出主页
+                    sleep(1000); */
+                    while (!desc("电视台").exists()) {
+                        //console.log("正在等待加载出主页");
+                        back(); //返回联播频道界面
+                        sleep(1000);
+                    }
+                    //console.log(vLength,i);
+                    i++;
+                    if (i >= vCount) {
+                        break;
+                    }
+                } else if (text("你已经看到我的底线了").exists()) {
+                    console.error("Error：没有可以观看的视频了!");
+                    continue;
+                } else {
+                    listView.scrollForward(); //翻页
+                    scrollCount++;
+                    console.log("内翻页");
+                    sleep(1000);
+                    //t -= 1    
+                }
+            }
+        }
+        if (text("你已经看到我的底线了").exists() && i <= vCount) {
+            console.error("Error：没有可以观看的视频了!");
+            break;
+        } else {
+            // console.log(scrollCount);
+            if (scrollCount < 7) {
+                listView.scrollForward(); //翻页
+            } else {
+                swipe(x, h2, x, h1, 500);
+            }
+            scrollCount++;
+            console.log("外翻页");
+            sleep(1000);
+        }
+    }
+
+    /*
+    for (var i = 0, t = 1; i < vCount;) {
+        if (click(s, t) == true) {
+            console.log("即将学习第" + (i + 1) + "个视频!");
+            video_timing_news(i, vTime); //学习每个新闻联播小片段
+            back(); //返回联播频道界面
+            while (!desc("电视台").exists()); //等待加载出主页
+            sleep(1000);
+            i++;
+            t++;
+            if (i == 3 | t > 6) { //如果是平板等设备，请尝试修改i为合适值！
+                listView.scrollForward(); //翻页
+                sleep(2000);
+                t = 2;
+            }
+        } else {
+            listView.scrollForward(); //翻页
+            sleep(2000);
+            t = 2;
+        }
+    }*/
+    // id("home_bottom_tab_text_highlight").className("android.widget.TextView").text("工作").findOne().parent().click();
+    id("home_bottom_tab_button_work").click();
+    // text("工作").click();
+    // desc("工作").click();
+}
+
+
+/**
+ * @description: 听“电台”新闻广播函数  (视听学习+视听学习时长)---6+6=12分
+ * @param: null
+ * @return: null
+ */
+function listenToRadio() {
+    click("电台");
+    sleep(1000);
+    click("听广播");
+    sleep(2000);
+    if (textContains("最近收听").exists()) {
+        click("最近收听");
+        console.log("正在收听广播...");
+        sleep(1000);
+        back(); //返回电台界面
+        sleep(1000);
+        return true;
+    }
+    if (textContains("推荐收听").exists()) {
+        click("推荐收听");
+        console.log("正在收听广播...");
+        sleep(1000);
+        back(); //返回电台界面
+        sleep(1000);
+        return true;
+    }
+}
+
+/**
+@description: 停止广播
+@param: null
+@return: null
+*/
+function stopRadio() {
+    console.log("停止收听广播！");
+    click("电台");
+    sleep(1000);
+    click("听广播");
+    sleep(2000);
+    while (!(textContains("正在收听").exists() || textContains("最近收听").exists() || textContains("推荐收听").exists())) {
+        log("等待加载");
+        sleep(2000)
+    }
+    if (click("正在收听") == 0) {
+        var zj=textContains("最近收听").findOne().bounds();
+        var x=zj.centerX();
+        var y=zj.centerY();
+        click(x,y);
+        //click("最近收听");
+    }
+    sleep(3000);
+    id("v_play").findOnce(0).click();
+    sleep(2000)
+    if (id("btn_back").findOne().click() == 0) {
+        sleep(2000);
+        back();
+    }
+ }
+
+/**
+ * @description: 收藏加分享函数  (收藏+分享)---1+1=2分
+ * @param: i-文章标号
+ * @return: null
+ */
+function CollectAndShare(i) {
+    while (!textContains("欢迎发表你的观点").exists()) //如果没有找到评论框则认为没有进入文章界面，一直等待
+    {
+        sleep(1000);
+        console.log("等待进入文章界面")
+    }
+    console.log("正在进行第" + (i + 1) + "次收藏和分享...");
+
+    var textOrder = text("欢迎发表你的观点").findOnce().drawingOrder();
+    var collectOrder = textOrder + 2;
+    var shareOrder = textOrder + 3;
+    var collectIcon = className("ImageView").filter(function(iv) {
+        return iv.drawingOrder() == collectOrder;
+    }).findOnce();
+
+    var shareIcon = className("ImageView").filter(function(iv) {
+        return iv.drawingOrder() == shareOrder;
+    }).findOnce();
+
+    //var collectIcon = classNameContains("ImageView").depth(10).findOnce(0);//右下角收藏按钮
+    // collectIcon.click(); //点击收藏
+    // console.info("收藏成功!");
+    // sleep(1000);
+
+    //var shareIcon = classNameContains("ImageView").depth(10).findOnce(1);//右下角分享按钮
+    shareIcon.click(); //点击分享
+    while (!text("分享到学习强国").exists()); //等待弹出分享选项界面
+    sleep(1000);
+    click("分享到学习强国");
+    sleep(2000);
+    console.info("分享成功!");
+    back(); //返回文章界面
+    sleep(1000);
+
+    // collectIcon.click(); //再次点击，取消收藏
+    // console.info("取消收藏!");
+    // sleep(1000);
+}
+
+/**
+ * @description: 单独的收藏加分享函数  (收藏+分享)---1+1=2分
+ * @param: i-文章标号
+ * @return: null
+ */
+function newCollectAndShare() {
+    console.log("开始评论分享收藏");
+    while (!desc("工作").exists()); //等待加载出主页
+    if (id("home_bottom_tab_icon_large").exists()) {
+        console.log("在主页面");
+    } else {
+        console.log("没找到学习按键");
+    }
+    desc("工作").click(); //点击主页正下方的"学习"按钮
+    sleep(2000);
+    click("推荐");
+    sleep(2000);
+    for(i=0;i<2;i++){
+    while (!id("comm_head_xuexi_mine").exists()); //等待加载出主页 
+    log("在主页面");
+   // scrollDown();
+    text('播报').findOnce(i).parent().parent().parent().parent().click();
+      while (!textContains("欢迎发表你的观点").exists()) //如果没有找到评论框则认为没有进入文章界面，一直等待
+    {
+        sleep(1000);
+        console.log("等待进入文章界面")
+    }
+    console.log("正在进行第" + (i + 1) + "次收藏和分享...");
+
+    var textOrder = text("欢迎发表你的观点").findOnce().drawingOrder();
+    var collectOrder = textOrder + 2;
+    var shareOrder = textOrder + 3;
+    var collectIcon = className("ImageView").filter(function(iv) {
+        return iv.drawingOrder() == collectOrder;
+    }).findOnce();
+
+    var shareIcon = className("ImageView").filter(function(iv) {
+        return iv.drawingOrder() == shareOrder;
+    }).findOnce();
+
+    //var collectIcon = classNameContains("ImageView").depth(10).findOnce(0);//右下角收藏按钮
+    // collectIcon.click(); //点击收藏
+    // console.info("收藏成功!");
+    // sleep(1000);
+
+    //var shareIcon = classNameContains("ImageView").depth(10).findOnce(1);//右下角分享按钮
+    shareIcon.click(); //点击分享
+    while (!text("分享到学习强国").exists()); //等待弹出分享选项界面
+    sleep(1000);
+    click("分享到学习强国");
+    sleep(2000);
+    console.info("分享成功!");
+    back(); //返回文章界面
+    sleep(1000);
+    Comment(i);
+    sleep(1000);
+    back();
+    sleep(1000);
+    }
+}
+    
+
+    
+    // collectIcon.click(); //再次点击，取消收藏
+    // console.info("取消收藏!");
+    // sleep(1000);
+    
+
+
+/**
+ * @description: 评论函数---2分
+ * @param: i-文章标号
+ * @return: null
+ */
+function Comment(i) {
+    while (!textContains("欢迎发表你的观点").exists()) //如果没有找到评论框则认为没有进入文章界面，一直等待
+    {
+        sleep(1000);
+        console.log("等待进入文章界面")
+    }
+    click("欢迎发表你的观点"); //单击评论框
+    console.log("正在进行第" + (i + 1) + "次评论...");
+    sleep(1000);
+    var num = random(0, commentText.length - 1) //随机数
+    setText(commentText[num]); //输入评论内容
+    sleep(1000);
+    click("发布"); //点击右上角发布按钮
+    console.info("评论成功!");
+    sleep(2000);
+
+}
+
+
+/**
+ * @description: 本地频道
+ * @param: null
+ * @return: null
+ */
+function localChannel() {
+        while (!desc("工作").exists()); //等待加载出主页
+           sleep(2000);
+                console.log("点击本地频道");
+                   
+         className("android.widget.TextView").text("四川").findOne().parent().click();
+                         sleep(2000);
+          className("android.support.v7.widget.RecyclerView").findOne().child(form.bendi).click();
+          sleep(2000);
+                                                           console.log("返回主界面");
+                                                                   sleep(2000);
+                                                                           back();
+                                                   sleep(2000);
+className("android.widget.TextView").text("要闻").findOne().parent().parent().child(0).click();                                                                 
+}
+
+
+/**
+ * @description: 获取积分
+ * @param: null
+ * @return: null
+ */
+function getScores() {
+    while (!text("积分").exists());//等待加载出主页
+    
+    console.log("正在获取积分...");
+    while (!text("积分明细").exists()) {
+        if (id("comm_head_xuexi_score").exists()) {
+            id("comm_head_xuexi_score").findOnce().click();
+        } else if (text("积分").exists()) {
+            text("积分").findOnce().parent().child(1).click();
+        }
+       
+    
+        sleep(4000)
+        
+        
+    }
+
+    let err = false;
+    while (!err) {
+        try {
+            className("android.widget.ListView").findOnce().children().forEach(item => {
+                let name = item.child(0).child(0).text();
+                let str = item.child(2).text().split("/");
+                let score = str[0].match(/[0-9][0-9]*/g);
+                myScores[name] = score;
+            });
+            err = true;
+        } catch (e) {
+            console.log(e);
+        }
+    }
+    console.log(myScores);
+    delay(1);
+
+
+    // while (!text("强国城兑福利").exists());
+    // console.log("正在获取点点通...");
+
+    // click("强国城兑福利");
+
+    // while (!text("点点通明细").exists());
+    // text("点点通明细").findOnce().parent().click();
+    // //sleep(5000);
+    // while (!text("今日").exists());
+    // sleep(1000);
+    // myDiandian = {
+    //     "有效浏览": 0,
+    //     "有效视听": 0,
+    //     "挑战答题": 0
+    // };
+    // try {
+    //     var diandian = className("android.widget.ListView").findOnce(1).children();
+    //     if (!diandian.empty()) {
+    //         for (i = 1; i < diandian.length; i++) {
+    //             let name = diandian[i].child(2).text();
+    //             let str = diandian[i].child(3).text();
+    //             let score = parseInt(str.match(/[0-9][0-9]*/g));
+    //             myDiandian[name] += score
+    //         }
+    //     }
+    // } catch (e) {
+    //     // console.warn(e);
+    // }
+    // console.log(myDiandian);
+    // 阅读文章数
+    var wzsm = random(7,9);
+    var m = random(1,2);
+                        switch(m){
+                        case 1:
+                        var wzsc = 110;
+                        break;
+                        
+                        case 2:
+                        
+                        var wzsc = 300;
+                        break;
+                        }
+    console.info(wzsc);
+    //var aTime2 = random(250,270) - wzsc;
+   // aTime1 = aTime2;
+    aCount = wzsm;
+    // if (aCount < (12 - myDiandian["有效浏览"])) {
+    //     aCount = 12 - myDiandian["有效浏览"];
+    // }
+    // 阅读文章时长
+    var sc = wzsc/aCount;
+    if (aCount > 0) {
+        aTime = Math.ceil(sc);
+    } else {
+        aTime = 0;
+    }
+    // aTime = 30;
+    // 视频学习数
+   var sps = random(7,9);
+   vCount = sps;
+   
+    // 视频学习时长
+    rTime = 360;
+    if (rTime < 0) {
+        rTime = 0;
+    }
+    // 如果条数够了，时长还不够，学习小视频，三条一个循环
+    if (vCount == 0 && rTime > 0) {
+        vCount = 3;
+    }
+    // 分享与发表观点
+    if ((myScores["分享"] == 1) && (myScores["发表观点"] == 1)) {
+        cCount = 0;
+    } else {
+        cCount = 2;
+    }
+    // 挑战答题次数
+    lCount = 1;
+    //aCount = 12;
+    //aTime = 30;
+    //vCount = 12;
+    //lCount = 1;
+    //rTime = 150;
+
+    console.log('剩余文章：' + aCount.toString() + '篇')
+    console.log('剩余每篇文章学习时长：' + aTime.toString() + '秒')
+    console.log('剩余视频：' + vCount.toString() + '个')
+    console.log('剩视听学习时长：' + rTime.toString() + '秒')
+    /*
+    sleep(1000);
+    back();
+    sleep(1000);
+    back();
+    sleep(1000);
+    back();
+    sleep(1000);
+    back();*/
+    while (!desc("工作").exists()) {
+        //console.log("正在等待加载出主页");
+        back();
+        sleep(1000);
+    }
+}
+//纯积分获取
+
+function getS() {
+    while (!text("积分").exists());//等待加载出主页
+    console.log("正在获取积分...");
+    while (!text("积分明细").exists()) {
+        if (id("comm_head_xuexi_score").exists()) {
+            id("comm_head_xuexi_score").findOnce().click();
+        } else if (text("积分").exists()) {
+            text("积分").findOnce().parent().child(1).click();
+        }
+        delay(4);
+    }
+
+    let err = false;
+    while (!err) {
+        try {
+            className("android.widget.ListView").findOnce().children().forEach(item => {
+                let name = item.child(0).child(0).text();
+                let str = item.child(2).text().split("/");
+                let score = str[0].match(/[0-9][0-9]*/g);
+                myScores[name] = score;
+            });
+            err = true;
+        } catch (e) {
+            console.log(e);
+        }
+    }
+    console.log(myScores);
+    delay(1);
+    while (!desc("工作").exists()) {
+        //console.log("正在等待加载出主页");
+        back();
+        sleep(1000);
+    }
+}
+
+function getS1() {
+    while (!text("积分").exists());//等待加载出主页
+    console.log("正在获取积分...");
+    while (!text("积分明细").exists()) {
+        if (id("comm_head_xuexi_score").exists()) {
+            id("comm_head_xuexi_score").findOnce().click();
+        } else if (text("积分").exists()) {
+            text("积分").findOnce().parent().child(1).click();
+        }
+        delay(4);
+    }
+
+    let err = false;
+    while (!err) {
+        try {
+            className("android.widget.ListView").findOnce().children().forEach(item => {
+                let name = item.child(0).child(0).text();
+                let str = item.child(2).text().split("/");
+                let score = str[0].match(/[0-9][0-9]*/g);
+                myScores[name] = score;
+            });
+            err = true;
+        } catch (e) {
+            console.log(e);
+        }
+    }
+    }
+
+/**
+ * @description: 获取ID号
+ * @param: null
+ * @return: null
+ */
+function getUserId() {
+    while (!text("我的").exists()); //等待加载出主页
+
+    console.log("正在获取学号...");
+    //id("comm_head_xuexi_mine").waitFor();
+   // while (!id("comm_head_xuexi_mine").exists());
+    // id("comm_head_xuexi_mine").click();
+   // id("comm_head_xuexi_mine").findOne().click()
+   sleep(1000)
+   text('我的').findOne().click();
+    sleep(1000)
+    while(!id("my_avatar").exists())
+    sleep(600)
+    if (id("my_avatar").exists()) {
+        id("my_avatar").findOne().click();
+    }
+    id("tv_item_title").className("android.widget.TextView").text("学号").waitFor();
+    while (!text("学号").exists());
+    sleep(500);
+    idNumber = id("tv_item_content").findOnce(1).parent().child(1).text();
+    console.log("学号：", idNumber);
+
+    while (!desc("工作").exists()) {
+        //console.log("正在等待加载出主页");
+        back();
+        sleep(1000);
+    }
+}
+
+/**
+ * @description: 启动app
+ * @param: null
+ * @return: null
+ */
+function start_app() {
+    var h = device.height;
+    h1= h-900;
+    console.setPosition(0, device.height * 0.45); //部分华为手机console有bug请注释本行
+    if (form.xfk){
+    console.show();
+   }
+     //部分华为手机console有bug请注释本行
+    console.log("正在启动app...");
+//     FuncConfig = storages.create("强国学习配置"); 
+//     //FuncList = {};
+//   // accountList = {};
+// var articlely = Funconfig.get("article");
+// var videoly = Funconfig.get("video");
+// var suby = Funconfig.get("sub");
+// var daily = Funconfig.get("daliy");
+// var weekly=Funconfig.get("week");
+// var specially=Funconfig.get("special");
+// var competely=Funconfig.get("compete");
+// var challengely = Funconfig.get("challenge");
+// var fightly = Funconfig.get("fight");
+//  //  sleep(2000);
+    //读取脚本配置
+    //FuncConfig = storages.create("强国学习配置"); 
+    FuncList = {};
+    //accountList = {};
+   // FuncList["文章模式"] = FuncConfig.get("文章模式");
+    //FuncList["账户切换"] = FuncConfig.get("账户切换");
+    FuncList["文章学习"] = form.article;
+    FuncList["广播学习"] = form.radio;
+    FuncList["视频学习"] = form.video;
+    FuncList["订阅"] = form.sub;
+    FuncList["分享评论"] = form.share;
+    FuncList["本地频道"] = form.local;
+    FuncList["日常答题"] = form.daliy;
+    FuncList["每周答题"] = form.week;
+    FuncList["专项答题"] = form.special;
+    FuncList["四人赛"] = form.compete;
+    FuncList["挑战答题"] = form.challenge;
+    FuncList["对战答题"] = form.fight;
+   // FuncList["帐号列表"] = FuncConfig.get("帐号列表");
+   // FuncList["开始序号"] = FuncConfig.get("开始序号");
+
+    console.log(FuncList);
+    if (!launchApp("学习强国")) //启动学习强国app
+    {
+        console.error("找不到学习强国App!");
+        return;
+    }
+    while (!text("我的").exists()) {
+        console.log("正在检测主页");
+       // sleep(2000);
+        //back();
+        sleep(1000);
+    }
+    sleep(1000);
+    var xbb = textContains("新版本").findOne(1000);
+if (xbb == null){
+    console.info("没有新版本")
+}
+else{
+    text("取消").findOne(1000).click();
+}
+    sleep(1000);
+}
+
+/**
+ * @description: 数组洗牌//"ui";
+/*
+runtime.loadJar('./jsoup-1.12.1.jar');
+importClass(org.jsoup.Jsoup);
+importClass(org.jsoup.nodes.Document);
+importClass(org.jsoup.select.Elements);
+*/
+
+importClass(android.database.sqlite.SQLiteDatabase);
+var questionCommon = require("./questionCommon.js");
+var tikuCommon = require("./tikuCommon.js");
+
+
+/**
+ * @Description: Auto.js z-helper (6+6)+(6+6)+(1+1+2)+6+6+1+1=42分
+ * @version: 3.1.6
+ * @Author: Ivan
+ * @Date: 2020-10-26
+ */
+
+/*var aCount = 6; //文章默认学习篇数
+var vCount = 6; //小视频默认学习个数
+var cCount = 2; //收藏+分享+评论次数
+var asub = 2;
+var aTime = 62; //每篇文章学习-103秒 103*7≈720秒=12分钟
+var vTime = 20; //每个小视频学习-15秒
+var rTime = 360; //广播收听-18分钟
+
+var commentText = ["支持党，支持国家！", "为实现中华民族伟大复兴而不懈奋斗！", "紧跟党走，毫不动摇！",
+    "不忘初心，牢记使命", "努力奋斗，报效祖国！"
+]; //评论内容，可自行修改，大于5个字便计分
+
+var aCatlog = "推荐" //文章学习类别，可自定义修改为“要闻”、“新思想”等
+
+var lCount = 1; //挑战答题轮数
+var qCount = random(5,8); //挑战答题每轮答题数
+var rightCount = 0; //争上游正确答题记数
+var myScores = {}; //分数
+//var myDiandian = {}; //点点通
+var idNumber = ""; //学号
+var customize_flag = false; //自定义运行标志*/
+
+/**
+ * @description: 延时函数
+ * @param: seconds-延迟秒数
+ * @return: null
+ */
+function delay(seconds) {
+    sleep(1000 * seconds); //sleep函数参数单位为毫秒所以乘1000
+}
+   
+/**
+ * @description: 生成从minNum到maxNum的随机数
+ * @param: minNum-较小的数
+ * @param: maxNum-较大的数
+ * @return: null
+ */
+function randomNum(minNum, maxNum) {
+    switch (arguments.length) {
+        case 1:
+            return parseInt(Math.random() * minNum + 1, 10);
+        case 2:
+            return parseInt(Math.random() * (maxNum - minNum + 1) + minNum, 10);
+        default:
+            return 0;
+    }
+} 
+
+/**
+ * @description: 文章学习计时(弹窗)函数
+ * @param: n-文章标号 seconds-学习秒数
+ * @return: null
+ */
+function article_timing(n, seconds) {
+    seconds = randomNum(seconds - 5, seconds + 5);
+    h = device.height; //屏幕高
+    w = device.width; //屏幕宽
+    // x = w * 0.64;
+    x = (w / 5) * 3;
+    h1 = h * 0.2;
+    h2 = h * 0.85;
+    sleep(10000);
+    for (var i = 0; i < seconds; i++) {
+        while (!textContains("欢迎发表你的观点").exists()) //如果离开了文章界面则一直等待
+        {
+            console.error("当前已离开第" + (n + 1) + "文章界面，请重新返回文章页面...");
+            sleep(1000);
+        }
+        if (i % 5 == 0) //每5秒打印一次学习情况
+        {
+            console.info("第" + (n + 1) + "篇文章已经学习" + (i + 1) + "秒,剩余" + (seconds - i - 1) + "秒!");
+        }
+        sleep(1000);
+        var shijian = random(10,20);
+        if (i % shijian == 0) //每10秒滑动一次，如果android版本<7.0请将此滑动代码删除
+        {
+            toast("这是防息屏toast,请忽视-。-");
+            if (i <= seconds / 2) {
+                swipe(x, h2, x, h1, randomNum(450, 550)); //向下滑动
+                //gestures([randomNum(450,550), [x, h2], [x, h1]]);
+            } else {
+                swipe(x, h1, x, h2, randomNum(450, 550)); //向上滑动
+                //gesture(randomNum(450,550), [x, h1], [x, h2]);
+            }
+        }
+    }
+}
+
+/**
+ * @description: 视频学习计时(弹窗)函数
+ * @param: n-视频标号 seconds-学习秒数
+ * @return: null
+ */
+function video_timing_bailing(n, seconds) {
+    seconds = randomNum(seconds - 5, seconds + 5);
+    for (var i = 0; i * 5 < seconds; i++) {
+        while (!textContains("分享").exists()) //如果离开了百灵小视频界面则一直等待
+        {
+            console.error("当前已离开第" + (n + 1) + "个百灵小视频界面，请重新返回视频");
+            sleep(2000);
+        }
+        if (seconds > ((i + 1) * 5)) {
+            sleep(5000);
+            console.info("第" + (n + 1) + "个小视频算法")
+        }
+    }
+}
+/*
+ * @param: 数组arr
+ * @return: 随机排序后的数组arr
+ */
+function randSort(arr){
+    for(i = 0,len = arr.length;i < len; i++ ){
+        var rand = parseInt(Math.random()*len);
+        var temp = arr[rand];
+        arr[rand] = arr[i];
+        arr[i] = temp;
+    }
+    return arr;
+}
+function yanzheng() {
+    var yz =storages.create("ABC");
+    yz.put("a",456);
+    }
+    function yanzheng1() {
+    var yz =storages.create("ABC1");
+    yz.put("a",456);
+    }
+    function yanzheng2() {
+    var yz =storages.create("ABC2");
+    yz.put("a",456);
+    }
+//主函数
+function main() {
+    if (!tikuCommon.judge_tiku_existence()) { //题库不存在则退出
+        return;
+    }
+    if (!tikuCommon.judge_tiku_columnName_existence("option")) {
+        var sql = "ALTER  TABLE  tiku  ADD COLUMN  option CHAR(10)"
+        // tikuCommon.executeSQL(sql);
+        return;
+    }
+    // 开启截屏功能
+   /* if (!requestScreenCapture()) { 
+        console.log("请求截图失败"); 
+        requestScreenCapture();
+        exit(); 
+    }  */
+ 
+    storages.remove("ABC");
+    storages.remove("ABC1");
+    storages.remove("ABC2");
+    sleep(200);
+    start_app(); //启动app
+    var start = new Date().getTime(); //程序开始时间
+    let lastWeek = getLastweekDateString();
+    console.info(lastWeek);
+    cleanLearnedArticle(lastWeek); //先清空浏览记录
+    date_string = getTodayDateString();
+    // localChannel(); //本地频道
+    //除文章和视频学习外，都要先判断
+    sleep(300)
+    if (form.xfk1){
+        idNumber = form.xuehao;}
+    else{
+    getUserId(); //获取学号
+    sleep(300)}
+    getScores(); //获取积分
+    sleep(300);
+    var ccb =12 - (myScores['视听学习']);
+    var bbm =  isNaN(ccb);
+    console.log(ccb);
+    console.log(bbm);
+    while (bbm){ 
+    console.log("重新获取分数");
+    getScores(); 
+    var ccb =12- myScores['视听学习'];
+    var bbm =  isNaN(ccb);
+    }
+    let radioOn = false;
+    var musicVolume = device.getMusicVolume();
+    device.setMusicVolume(0);
+    try {
+        if ((FuncList['本地频道'])) {
+            localChannel(); //本地频道
+            //console.log("电台");
+            radioOn = true;
+        }
+        if ((rTime > 0)&&(FuncList['广播学习'])) {
+            listenToRadio(); //听电台广播
+            radioOn = true;
+            var r_start = new Date().getTime(); //广播开始时间
+        }
+        var startNumber = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+        if (form.sxx){
+            startNumber = [9,6,4,7,8,1,10,3,2,5]}
+         else   
+        {startNumber = randSort(startNumber);}
+        console.info(startNumber);
+        for (var l = 0; l < startNumber.length; l++){
+            toastLog(startNumber[l]);
+            switch (startNumber[l]) {
+                case 1:
+                    toastLog("1");
+                    if ((myScores['挑战答题'] != 6)&&(FuncList['挑战答题'])) {
+                            threads.start(function(){
+        setTimeout(function(){
+            var yz =storages.create("ABC1");
+            var b = yz.get("a");
+            if (b != 456) {
+            sleep(1000);
+                engines.execScriptFile("yijian2.js");
+        }
+        else{
+             storages.remove("ABC1");
+            console.info("已验证");
+        }
+         },180000);
+    });
+                      
+                      
+                        challengeQuestion(); //挑战答题
+                         yanzheng1();
+                    }
+                    break;
+                case 2:
+                    toastLog("2");
+                    if ((myScores['双人对战'] == 0)&&(FuncList['对战答题'])) {
+                        //doubleBattle(); //双人对战
+                         threads.start(function(){
+        setTimeout(function(){
+            var yz =storages.create("ABC2");
+            var b = yz.get("a");
+            if (b != 456) {
+                sleep(1000);
+                engines.execScriptFile("yijian2.js");
+        }
+        else{
+             storages.remove("ABC2");
+            console.info("已验证");
+        }
+         },70000);
+    });
+                        SRQuestion();
+                        yanzheng2();
+                    }
+                    break;
+                case 3:
+                    toastLog("3");
+                    if ((myScores['四人赛'] < 3)&&(FuncList['四人赛'])) {
+                        //competition(); //争上游答题
+          threads.start(function(){
+        setTimeout(function(){
+            var yz =storages.create("ABC");
+            var b = yz.get("a");
+            if (b != 456) {
+            sleep(1000);
+                engines.execScriptFile("yijian2.js");
+        }
+        else{
+             storages.remove("ABC");
+            console.info("已验证");
+        }
+         },120000);
+    });
+                        zsyQuestion();
+                        yanzheng();
+                    }
+                    break;
+                case 4:
+                    toastLog("4");
+                    if ((myScores['每日答题'] != 5)&&(FuncList['日常答题'])) {
+                        dailyQuestion(); //每日答题
+                    }
+                    break;
+                case 5:
+                    toastLog("5");
+                //     let curr_time = new Date();
+                //     let weekNum = curr_time.getDay();
+                //     // console.log('weekday:' + weekNum);
+                    if ((myScores['订阅'] < 2 )&&form.sub) {
+                        sub(); //订阅学习平台
+                        backMain();
+                     }
+                     break;
+                case 7:
+                    toastLog("7");
+                    if(((myScores['每周答题']==0)&&form.week)){
+                        weeklyQuestion();
+                    }
+                    break;
+                case 8:
+                    toastLog("8");
+                    if(((myScores['专项答题']==0)&&form.special)||((myScores['专项答题']==0)&&xq > 2)){
+                        zhuanxiangQuestion();
+                    }
+                    break;
+                case 9:
+                    toastLog("9");
+                    if((myScores['分享']==0)&&form.share){
+                        newCollectAndShare();
+                    }
+                    break;
+                case 10:
+                    toastLog("10");
+                     if ((myScores['视听学习'] != 6)&&(FuncList['视频学习'])) {
+                     bailing();
+                     listenToRadio();
+                    }
+                    break;
+                case 6:
+                    toastLog("6");
+                    // 原新闻学习
+                    // 原打开电台，开始计时
+                   /* if (aCount == 0) {
+                        aCount = cCount;
+                        aTime = 10;
+                    }*/
+                    if ((aCount != 0)&&(FuncList['文章学习'])&&(myScores['我要选读文章'] == 0 )) {
+                        articleStudy(); //学习文章，包含点赞、分享和评论
+                        //getScores();
+                    }
+            }
+        }
+        getScores();
+         sleep(300);
+        if ((FuncList['文章学习'])&&(myScores['我要选读文章'] != 12)) {
+                       aTime2 = (12- myScores['我要选读文章']);
+                       aTime1 =aTime2*60;
+                        articleStudy1(); //学习文章，包含点赞、分享和评论
+                    }
+        if (((rTime > 0) && !radioOn)&&(FuncList['广播学习'])) {
+            listenToRadio(); //继续听电台
+            radioOn = true;
+        }
+        var end = new Date().getTime(); //广播结束时间
+        var radio_time = (parseInt((end - r_start) / 1000)); //广播已经收听的时间
+        radio_timing(radio_time, rTime - radio_time); //广播剩余需收听时间
+       
+      if ((myScores['视听学习'] != 6)&&(FuncList['视频学习'])) {
+            
+            console.info('小视频学习')
+            xCount= 9 - (myScores['视听学习']);
+            //console.info("视频数目"+xCount+"个");
+            bailing();
+            // vTime=30;
+            // videoStudy_bailing(vCount, vTime); //看视频
+            
+        }
+          while (vCount < 0) {
+           /* getScores();
+            if (vCount != 0) {
+                console.log('小视频学习')
+                videoStudy_bailing(vCount, vTime); //看视频
+            }
+            if (aCount != 0) {
+                console.log('文章学习')
+                // aCatlog = "时评"
+                articleStudy(); //看视频
+            }*/
+            //aCount = 0;
+        }
+    } catch(e) {
+        console.error(e);
+    }
+ /*
+            if ((myScores['视听学习时长'] != 6)&&(FuncList['视频学习'])) {
+                console.log('听广播')
+                listenToRadio();
+         
+                 }*/
+            
+            // if ((aCount != 0)&&(FuncList['文章学习'])) {
+            //     console.log('文章学习')
+            //     // aCatlog = "时评"
+            //     articleStudy(); //看视频
+            // }
+            //aCount = 0;
+   sleep(1000);
+    if (radioOn) {
+            stopRadio();
+        }
+    sleep(2000);
+    getS1();
+    sleep(300);
+    var str = "";
+    str += "剩余电量: " + device.getBattery()+"%";
+   if (form.tuisong) { 
+    sleep(2000);
+    /*console.info("已发送至微信");
+    toast("已发送至微信");
+    sleep(300);
+    var zf = textContains("今日已累积").findOne();
+    zf1 = zf.text();
+    var a = text("成长总积分").findOne().parent().child(3)
+        b = "总积分："+a.text()+"分";
+        qq = "运行结束,共耗时" + (parseInt(end - start)) / 1000 + "秒";
+    sleep(2000);
+    var url = "http://www.pushplus.plus/send/"
+    var res = http.postJson(url,{
+        "token":form.jiekou, 
+        "title":idNumber+zf1+"，"+b+","+str+","+qq,
+        "content":myScores,
+       "template":"json"});
+    res;
+    */
+launchApp("Hamibot");
+sleep(5000);
+id("button").findOne().click();
+sleep(3000);
+className("android.view.View").text("天天向上Pro(胜率高、DD通)").waitFor();
+sleep(3000);
+var m = className("android.view.View").text("天天向上Pro(胜率高、DD通)").findOne();
+var m1 = m.bounds().centerX();
+var m2 =m.bounds().centerY();
+if(className("android.widget.Button").text("更新脚本").exists()){
+  //className("android.widget.Button").text("更新脚本").findOne().click();
+sleep(2000);
+click(250,1650);  
+
+}
+else{
+click(m1-243,m2+143);}
+    
+    
+    }
+
+    device.setMusicVolume(musicVolume);
+    end = new Date().getTime(); //程序结束时间
+    console.log("运行结束,共耗时" + (parseInt(end - start)) / 1000 + "秒");
+ 
+    if (form.kill){
+    shell ("am force-stop cn.xuexi.android",true);
+    engines.stopAllAndToast();}
+
+
+    if (form.kill1){
+       var storages2 = storages.create("ABC");
+       storages2.put("a",456); 
+    }
+
+}
+
+
+/********************************************UI部分***********************************************/
+/*
+auto.waitFor(); //等待获取无障碍辅助权限
+
+ui.layout(
+    <vertical>
+        <text textSize="16sp" textColor="red" text="欢迎使用z-helper!" />
+        <button id="all" h="90" text="完整运行" />
+        <button id="customize" h="90" text="自定义运行（文章视频数量按照自定义值）" />
+        <button id="cq" h="60" text="挑战答题" />
+        <button id="dq" h="60" text="每日答题" />
+        <button id="wq" h="60" text="每周答题" />
+        <button id="zq" h="60" text="专项答题" />
+        <button id="stop" h="70" text="停止运行" />
+        
+        <horizontal>
+            <text textSize="16sp" marginLeft="15" textColor="black" text="文章学习类别:" />
+            <input id="acatlog" text="" />
+        </horizontal>
+        
+        <horizontal>
+            <text textSize="16sp" marginLeft="15" textColor="black" text="文章数量(个):" />
+            <input id="acount" w="30" text="" />
+            <text textSize="16sp" marginLeft="15" textColor="black" text="视频数量(个):" />
+            <input id="vcount" w="30" text="" />
+        </horizontal>
+        
+        <horizontal>
+            <text textSize="16sp" marginLeft="15" textColor="black" text="挑战答题轮数:" />
+            <input id="lcount" w="30" text="" />
+            <text textSize="16sp" marginLeft="15" textColor="black" text="挑战答题每轮答题数:" />
+            <input id="qcount" w="30" text="" />
+        </horizontal>
+        
+        
+        <button w="250" layout_gravity="center" id="about" text="关于本助手" />
+    </vertical>
+);
+
+ui.acatlog.setText(aCatlog.toString());
+ui.acount.setText(aCount.toString());
+ui.vcount.setText(vCount.toString());
+ui.lcount.setText(lCount.toString());
+ui.qcount.setText(qCount.toString());
+
+var thread = null;
+
+ui.all.click(function() {
+    if (thread != null && thread.isAlive()) {
+        alert("注意!", "当前程序正在运行，请结束之前进程");
+        return;
+    }
+    toast("开始完整运行");
+    thread = threads.start(function() {
+        aCatlog = ui.acatlog.getText();
+        lCount = parseInt(ui.lcount.getText());
+        qCount = parseInt(ui.qcount.getText());
+        main();
+    });
+});
+
+ui.customize.click(function() {
+    if (thread != null && thread.isAlive()) {
+        alert("注意!", "当前程序正在运行，请结束之前进程");
+        return;
+    }
+    toast("开始自定义运行");
+    thread = threads.start(function() {
+        aCount = parseInt(ui.acount.getText());
+        vCount = parseInt(ui.vcount.getText());
+        aCatlog = ui.acatlog.getText();
+        lCount = parseInt(ui.lcount.getText());
+        qCount = parseInt(ui.qcount.getText());
+        customize_flag = true;
+        console.log('文章数量：' + aCount.toString() + '篇')
+        console.log('视频数量：' + vCount.toString() + '个')
+        console.log('类别：' + aCatlog)
+        main();
+    });
+});
+
+
+ui.cq.click(function() {
+    if (thread != null && thread.isAlive()) {
+        alert("注意!", "当前程序正在运行，请结束之前进程");
+        return;
+    }
+    thread = threads.start(function() {
+        lCount = parseInt(ui.lcount.getText());
+        qCount = parseInt(ui.qcount.getText());
+        start_app();
+        challengeQuestion();
+    });
+});
+
+ui.dq.click(function() {
+    if (thread != null && thread.isAlive()) {
+        alert("注意!", "当前程序正在运行，请结束之前进程");
+        return;
+    }
+    thread = threads.start(function() {
+        start_app();
+        dailyQuestion();
+    });
+});
+
+ui.zq.click(function() {
+    if (thread != null && thread.isAlive()) {
+        alert("注意!", "当前程序正在运行，请结束之前进程");
+        return;
+    }
+    thread = threads.start(function() {
+        console.setPosition(0, device.height / 2); //部分华为手机console有bug请注释本行
+        console.show(); //部分华为手机console有bug请注释本行
+        console.log("正在启动app...");
+        if (!launchApp("学习强国")) //启动学习强国app
+        {
+            console.error("找不到学习强国App!");
+            return;
+        }
+        zhuanxiangQuestion();
+    });
+});
+
+ui.wq.click(function() {
+    if (thread != null && thread.isAlive()) {
+        alert("注意!", "当前程序正在运行，请结束之前进程");
+        return;
+    }
+    thread = threads.start(function() {
+        console.setPosition(0, device.height / 2); //部分华为手机console有bug请注释本行
+        console.show(); //部分华为手机console有bug请注释本行
+        console.log("正在启动app...");
+        if (!launchApp("学习强国")) //启动学习强国app
+        {
+            console.error("找不到学习强国App!");
+            return;
+        }
+        console.log('每周')
+        weeklyQuestion();
+    });
+});
+
+ui.stop.click(function() {
+    if (thread != null && thread.isAlive()) {
+        threads.shutDownAll();
+        toast("已停止运行！")
+        console.hide();
+    } else {
+        toast("当前没有线程在运行！")
+    }
+});
+/*
+ui.update.click(function () {
+    if (thread != null && thread.isAlive()) {
+        alert("注意!", "当前程序正在运行，请结束之前进程");
+        return;
+    }
+    confirm("确认更新题库吗?")
+    .then(c => {
+        if(c){
+            console.show();
+            thread = threads.start(function () {
+                updateTikunet()
+            });
+            console.hide();
+        }
+    });
+});
+
+ui.about.click(function() {
+    alert("z-helper", "本脚本只可用于个人学习Auto.js，不得用于一切商业或违法用途，否则追究责任！造成的后果自负！\n 任何问题请上github交流!");
+});
+*/
+
+
+/*************************************************挑战答题部分******************************************************/
+
+/**
+ * @description: 挑战答题
+ * @param: null
+ * @return: null
+ */
+function challengeQuestion() {
+    while (!id("comm_head_xuexi_mine").exists());
+    id("comm_head_xuexi_mine").click();
+    //while (!textContains("我的").exists());
+    //text("我的").click();
+    while (!textContains("我要答题").exists());
+    sleep(1000);
+    click("我要答题");
+    while (!text("每日答题").exists());
+    sleep(1000);
+    let myImage = className("android.view.View").text("每日答题").findOne();
+    // console.log(myImage.parent().parent().childCount());
+    myImage = myImage.parent().parent().child(10);
+    myImage.click();
+    // text("挑战答题").click();
+    console.verbose("开始挑战答题")
+    sleep(4000);
+    let conNum = 0; //连续答对的次数
+    let lNum = 1; //轮数
+    while (true) {
+        questionCommon.challengeQuestionLoop(conNum, qCount);
+        sleep(randomNum(3,6) * 1000);
+        if (text("v5IOXn6lQWYTJeqX2eHuNcrPesmSud2JdogYyGnRNxujMT8RS7y43zxY4coWepspQkvw" +
+                "RDTJtCTsZ5JW+8sGvTRDzFnDeO+BcOEpP0Rte6f+HwcGxeN2dglWfgH8P0C7HkCMJOAAAAAElFTkSuQmCC").exists()) //遇到❌号，则答错了,不再通过结束本局字样判断
+        {
+            if (lNum >= lCount && conNum >= qCount) {
+                console.verbose("挑战答题结束！");
+                /* 回退4次返回主页 */
+                while (!desc("工作").exists()) {
+                    //console.log("正在等待加载出主页");
+                    back();
+                    sleep(1000);
+                }
+                break;
+            } else {
+                console.verbose("等10秒开始下一轮...")
+                sleep(3000); //等待10秒才能开始下一轮
+                if (textStartsWith("确定退出答题练习").exists()) {
+                    click("退出");
+                }
+                back();
+                //desc("结束本局").click();//有可能找不到结束本局字样所在页面控件，所以直接返回到上一层
+                sleep(1000);
+                //desc("再来一局").click();
+                back();
+                while (!text("每日答题").exists());
+                sleep(1000);
+                // text("挑战答题").click();
+                let myImage = className("android.view.View").text("每日答题").findOne();
+                // console.log(myImage.parent().parent().childCount());
+                myImage = myImage.parent().parent().child(10);
+                myImage.click();
+                sleep(4000);
+                if (conNum >= qCount) {
+                    lNum++;
+                }
+                conNum = 0;
+            }
+            console.warn("第" + lNum.toString() + "轮开始...")
+        } else //答对了
+        {
+            conNum++;
+        }
+    }
+}
+
+/*************************************************争上游、双人对战部分*************************************************/
+
+/**
+ * @description: 双人对战
+ * @param: null
+ * @return: null
+ */
+function doubleBattle() {
+    while (!id("comm_head_xuexi_mine").exists());
+    id("comm_head_xuexi_mine").click();
+    //while (!textContains("我的").exists());
+    //text("我的").click();
+    while (!textContains("我要答题").exists());
+    sleep(1000);
+    click("我要答题");
+    while (!text("每日答题").exists());
+    sleep(1000);
+    let myImage = className("android.view.View").text("每日答题").findOne();
+    // console.log(myImage.parent().parent().childCount());
+    myImage = myImage.parent().parent().child(9);
+    myImage.click();
+    sleep(1000);
+    if (text("网络较差").exists()) {
+        toastLog("网络较差！下次再战！");
+        return;
+    }
+    className("android.view.View").text("").findOne().click();
+    console.verbose("开始双人对战");
+    // sleep(1000);
+    // text("开始对战").click();
+    //sleep(4000);
+    let conNum = 0; //连续答对的次数
+    let lNum = 1; //轮数
+    rightCount = 0; //答对题数
+    while (!text("开始").exists());
+    while (rightCount < 5) {
+        // sleep(1000)
+        // while (!className("ListView").exists());
+        /*if (!className("RadioButton").exists()) {
+            console.error("没有找到题目！请检查是否进入答题界面！");
+            console.log("停止");
+            break;
+        }*/
+        try {
+            var isRight = false;
+            // isRight = questionCommon.competitionLoop(conNum);
+            if (questionCommon.competitionLoop(conNum)) { //如果点击正确答案，正确点击数加1
+                rightCount++;
+            }
+        } catch (error) {
+            
+        }
+        if (text("100").depth(26).exists() || text("继续挑战").exists()) {
+            toastLog("有人100了");
+            break;
+        }
+        //sleep(randomNum(4000, 6000));
+        //sleep(3000);
+        conNum++;
+
+    }
+    // console.log("挑战答题结��");
+    console.verbose("双人对战结束");
+    sleep(5000);
+    back();
+    sleep(1000);
+    back();
+    text("退出").click();
+    while (!desc("工作").exists()) {
+        //console.log("正在等待加载出主页");
+        back();
+        sleep(1000);
+    }
+}
+
+/**
+ * @description: 争上游答题
+ * @param: null
+ * @return: null
+ */
+function competition() {
+    while (!id("comm_head_xuexi_mine").exists());
+    id("comm_head_xuexi_mine").click();
+    //while (!textContains("我的").exists());
+    //text("我的").click();
+    while (!textContains("我要答题").exists());
+    sleep(1000);
+    click("我要答题");
+    while (!text("每日答题").exists());
+    sleep(1000);
+    let myImage = className("android.view.View").text("每日答题").findOne();
+    // console.log(myImage.parent().parent().childCount());
+    myImage = myImage.parent().parent().child(8);
+    myImage.click();
+    //sleep(1000);
+    //className("android.view.View").text("").findOne().click();
+    if (text("网络较差").exists()) {
+        toastLog("网络较差！下次再战！");
+        return;
+    }
+    console.verbose("开始四人赛");
+    sleep(1000);
+    let conNum = 0; //连续答对的次数
+    let lNum = 2; //轮数
+    for (i = 0; i < lNum; i++) {
+        text("开始比赛").click();
+        //sleep(4000);
+        conNum = 0; //连续答对的次数
+        rightCount = 0; //答对题数
+        while (!text("开始").exists());
+        while (rightCount < 5) {
+            // sleep(1000)
+            // while (!className("ListView").exists());
+            /*if (!className("RadioButton").exists()) {
+                console.error("没有找到题目！请检查是否进入答题界面！");
+                console.log("停止");
+                break;
+            }*/
+            try {
+                var isRight = false;
+                // isRight = questionCommon.competitionLoop(conNum);
+                if (questionCommon.competitionLoop(conNum)) { //如果点击正确答案，正确点击数加1
+                    rightCount++;
+                }
+            } catch (error) { 
+                console.error(e);
+            } 
+            
+            if (text("100").depth(26).exists() || text("继续挑战").exists()) {
+                toastLog("有人100了");
+                break;
+            }
+            //sleep(randomNum(4000, 6000));
+            //sleep(3000);
+            conNum++;
+
+        }
+        sleep(5000);
+    // text("退出").click();
+    // 第二轮开始
+    //sleep(1000);
+    text("继续挑战").click();
+    }
+    // console.log("争上游答题结束");
+    console.verbose("四人赛结束");
+    while (!desc("工作").exists()) {
+        //console.log("正在等待加载出主页");
+        back();
+        sleep(1000);
+    }
+}
+
+/*************************************************每日答题部分***************************************************/
+/**
+ * @description: 每日答题
+ * @param: null
+ * @return: null
+ */
+function dailyQuestion() {
+    while (!id("comm_head_xuexi_mine").exists());
+    id("comm_head_xuexi_mine").click();
+    //text("我的").click();
+    while (!textContains("我要答题").exists());
+    sleep(1000);
+    click("我要答题");
+    while (!text("每日答题").exists());
+    sleep(1000);
+    text("每日答题").click();
+    console.verbose("开始每日答题");
+    sleep(2000);
+    let dlNum = 0; //每日答题轮数
+    while (true) {
+        questionCommon.dailyQuestionLoop();
+        if (text("再来一组").exists()) {
+            sleep(2000);
+            dlNum++;
+            if (!text("领取奖励已达今日上限").exists()) {
+                text("再来一组").click();
+                console.warn("第" + (dlNum + 1).toString() + "轮答题:");
+                sleep(1000);
+            } else {
+                console.verbose("每日答题结束！");
+                text("返回").click();
+                /* sleep(1000);
+                back();
+                sleep(1000);
+                back();
+                sleep(1000); */
+                while (!desc("工作").exists()) {
+                    //console.log("正在等待加载出主页");
+                    back();
+                    sleep(1000);
+                }
+                break;
+            }
+        }
+    }
+}
+
+
+/**
+ * @description: 每周答题
+ * @param: null
+ * @return: null
+ */
+function weeklyQuestion() {
+    while (!id("comm_head_xuexi_mine").exists());
+    id("comm_head_xuexi_mine").click();
+    //text("我的").click();
+    while (!textContains("我要答题").exists());
+    sleep(1000);
+    click("我要答题");
+    while (!text("每周答题").exists());
+    sleep(1000);
+    text("每周答题").click();
+    sleep(1000);
+    if (text("未作答").exists()){
+        text("未作答").findOne().parent().click();
+   // var x1=text("未作答").findOnce().bounds().centerX();
+   // var y1=text("未作答").findOnce().bounds().centerY();
+   // click(x1,y1);
+    console.verbose("开始每周答题");
+    sleep(2000);
+    let dlNum = 0; //每周答题轮数
+    //console.verbose("开始每周答题");
+    sleep(500);
+    while (true) {
+        questionCommon.dailyQuestionLoop();
+        if (text("返回").exists()) {
+            back();
+            sleep(1000);
+            back();
+            sleep(1000);
+            back();
+            //sleep(1000);
+            //back();
+            //sleep(1000);
+            while (!desc("工作").exists()) {
+                    //console.log("正在等待加载出主页");
+                    back();
+                    sleep(1000);
+                }
+            break;
+        }
+    }
+    console.verbose("每周答题结束");
+  }else{
+      console.verbose("无可答题目，返回主界面");
+      back();
+      sleep(1000);
+      back();
+      sleep(1000);
+      while (!desc("工作").exists()) {
+                    //console.log("正在等待加载出主页");
+                    back();
+                    sleep(1000);
+                }
+  }
+}
+
+/**
+ * @description: 专项答题
+ * @param: null
+ * @return: null
+ */
+function zhuanxiangQuestion() {
+    while (!id("comm_head_xuexi_mine").exists());
+    id("comm_head_xuexi_mine").click();
+    //text("我的").click();
+    while (!textContains("我要答题").exists());
+    sleep(1000);
+    click("我要答题");
+    while (!text("每周答题").exists());
+    sleep(1000);
+    text("专项答题").click();
+    sleep(1000);
+    if (text("开始答题").exists()){
+        text("开始答题").findOne().click();
+  //  var x1=text("开始答题").findOnce().bounds().centerX();
+   // var y1=text("开始答题").findOnce().bounds().centerY();
+   // click(x1,y1);
+    console.verbose("开始专项答题");
+    sleep(2000);
+    let dlNum = 0; //每周答题轮数
+    console.verbose("开始专项答题");
+    sleep(500);
+    //console.verbose("开始专项答题");
+    //sleep(2000);
+    while (true) {
+        questionCommon.dailyQuestionLoop();
+        if (text("返回").exists() || text("查看解析").exists()) {
+            back();
+            sleep(1000);
+            back();
+            sleep(1000);
+            back();
+            //sleep(1000);
+            //back();
+            //sleep(1000);
+            while (!desc("工作").exists()) {
+                    //console.log("正在等待加载出主页");
+                    back();
+                    sleep(1000);
+                }
+            break;
+        }
+    }
+    console.verbose("专项答题结束");
+    }else{
+           console.verbose("无可答题目，返回主界面");
+      back();
+      sleep(1000);
+      back();
+      sleep(1000);
+      while (!desc("工作").exists()) {
+                    //console.log("正在等待加载出主页");
+                    back();
+                    sleep(1000);
+                }   
+    }
+}
+
+/*************************************************争上游 双人答题部分******************************************************/
+
+/**
+ * @description: 争上游答题 20200928增加 四人赛 20210303改名
+ * @param: null
+ * @return: null
+ */
+ function zsyQuestion() {
+    while (!id("home_bottom_tab_button_work").exists());//等待加载出主页
+    id("home_bottom_tab_button_work").findOne().click();//点击主页正下方的"学习"按钮
+    delay(2);
+    text("我的").click();
+    if (!textContains("我要答题").exists()) {
+      delay(1);
+      click("我要答题");
+    }else {
+     (!text("我要答题").exists());
+      delay(1);
+      text("我要答题").findOne().parent().click();
+      }
+    while (!text("答题练习").exists());//可用词：排行榜 答题竞赛
+    delay(1);
+    className("android.view.View").text("答题练习").findOne().parent().child(8).click();
+    console.log("开始四人赛")
+    delay(2);
+    if(className("android.view.View").text("开始比赛").exists()){
+      className("android.view.View").text("开始比赛").findOne().click();
+      }
+      delay(3);
+    if (className("android.widget.Button").text("知道了").exists() || className("android.view.View").text("温馨提示").exists() || className("android.view.View").text("您已超过今日对战次数，请明日再来。").exists() ){
+       console.log("今日已完成30次对战，请明日再来");
+        back(); delay(1);
+        back(); delay(1);
+        back(); delay(1);
+       if (id("my_display_name").exists()){//我的主页，再退一步回主页
+         back(); delay(1); } //单纯back有概率退出但又有可能只退到我的页面 故加判断
+        return;
+     }   
+     delay(3);     
+    let zNum = 0;//轮数
+    while (true) {
+        if (className("android.view.View").text("继续挑战").exists() || textContains("继续挑战").exists())//遇到继续挑战，则本局结束
+        {console.info("四人赛本局结束!");
+         zNum++;
+          if (zNum >= zCount) {
+            console.log("四人赛结束，返回主页！");
+                //回退4次返回主页 
+            back(); delay(1);
+            back(); delay(1);
+            back(); delay(1);
+            back(); delay(1);
+            if (id("my_display_name").exists()){//我的主页，再退一步回主页
+            back(); delay(1); } //单纯back有概率退出但又有可能只退到我的页面 故加判断
+            break;
+            } else {
+           console.log("即将开始下一轮...")
+           delay(2);//等待2秒开始下一轮
+           back();
+          delay(1);
+           back();
+          while (!text("答题练习").exists());//排行榜 答题竞赛
+          delay(1);
+          className("android.view.View").text("答题练习").findOne().parent().child(8).click();
+          console.log("开始四人赛")
+          delay(2);
+          if (className("android.view.View").text("开始比赛").exists()){
+            className("android.view.View").text("开始比赛").findOne().click();
+            }
+          delay(3);
+        if (className("android.widget.Button").text("知道了").exists() || className("android.view.View").text("温馨提示").exists() || className("android.view.View").text("您已超过今日对战次数，请明日再来。").exists() ){
+          console.log("今日已完成30次对战，请明日再来");
+           back(); delay(1);
+           back(); delay(1);
+           back(); delay(1);
+          if (id("my_display_name").exists()){//我的主页，再退一步回主页
+            back(); delay(1); } //单纯back有概率退出但又有可能只退到我的页面 故加判断
+          return;
+         }   
+         delay(3);
+       } 
+        console.warn("第" + (zNum + 1).toString() + "轮开始...")
+        }
+       if (/*textContains("距离答题结束").exists() &&*/ !text("继续挑战").exists()){ //20201225答题界面变化 距离答题结束 删除
+       zsyQuestionLoop();
+        }
+    }
+}
+
+/**
+ * @description: 双人对战答题 20200928增加
+ * @param: null
+ * @return: null
+ */
+function SRQuestion() {
+    while (!id("home_bottom_tab_button_work").exists());//等待加载出主页
+    id("home_bottom_tab_button_work").findOne().click();//点击主页正下方的"学习"按钮
+    delay(2);
+    text("我的").click();
+    if (!textContains("我要答题").exists()) {
+     delay(1);
+     click("我要答题");
+      } else {
+     (!text("我要答题").exists());
+    delay(1);
+    text("我要答题").findOne().parent().click();
+     }
+    while (!text("答题练习").exists());//可用词：排行榜 答题竞赛
+    delay(1);
+    className("android.view.View").text("答题练习").findOne().parent().child(9).click();
+    console.log("开始双人对战")
+    delay(2);
+    if(className("android.view.View").text("邀请对手").exists()){
+     className("android.view.View").text("邀请对手").findOne().parent().child(0).click();
+      }//原为随机邀请对手
+     if(className("android.view.View").text("随机匹配").exists()){
+     className("android.view.View").text("随机匹配").findOne().parent().child(0).click();
+      }//20200125修改为邀请好友&随机匹配
+    delay(1);
+    if(className("android.view.View").text("开始对战").exists()){
+     className("android.view.View").text("开始对战").findOne().click();
+      }
+    delay(3);
+    if (className("android.widget.Button").text("知道了").exists() || className("android.view.View").text("温馨提示").exists() || className("android.view.View").text("您已超过今日对战次数，请明日再来。").exists() ){
+       console.log("今日已完成30次对战，请明日再来");
+        back(); delay(1);
+        back(); delay(1);
+        back(); delay(1);
+       if (id("my_display_name").exists()){//我的主页，再退一步回主页
+         back(); delay(1); } //单纯back有概率退出但又有可能只退到我的页面 故加判断
+        return;
+     }   
+     delay(3);    
+    let zNum = 1;//轮数
+    while (true) {
+      if (className("android.view.View").text("继续挑战").exists() || textContains("继续挑战").exists())//遇到继续挑战，则本局结束
+        { console.info("双人对战本局结束!");
+          zNum++;
+            if (zNum >= zCount) {
+                console.log("双人对战结束！返回主页！");
+                //回退4次返回主页 
+                back(); delay(1);
+                back(); delay(1);
+                if (text("退出").exists()){
+                className("android.widget.Button").text("退出").findOne().click();
+                delay(1);
+                }
+                back(); delay(1);
+                back(); delay(1);
+                if (id("my_display_name").exists()){//我的主页，再退一步回主页
+               back(); delay(1); } //单纯back有概率退出但又有可能只退到我的页面 故加判断
+                break;
+            } else {
+                console.log("即将开始下一轮...")
+                back();
+                delay(1);
+                back();
+                delay(1);
+                if (textContains("退出").exists()){
+                 className("android.widget.Button").text("退出").findOne().click();
+                 delay(1);
+                }
+                while (!text("答题练习").exists());//排行榜 答题竞赛
+                delay(1);
+                className("android.view.View").text("答题练习").findOne().parent().child(9).click();
+                console.log("开始双人对战");
+                delay(2);
+               if(className("android.view.View").text("邀请对手").exists()){
+                className("android.view.View").text("邀请对手").findOne().parent().child(0).click();
+               }//原为随机邀请对手
+               if(className("android.view.View").text("随机匹配").exists()){
+                className("android.view.View").text("随机匹配").findOne().parent().child(0).click();
+               }//20200125修改为邀请好友&随机匹配
+               delay(1);
+               if(className("android.view.View").text("开始对战").exists()){
+                className("android.view.View").text("开始对战").findOne().click();
+                }
+              delay(3);
+              if (className("android.widget.Button").text("知道了").exists() || className("android.view.View").text("温馨提示").exists() || className("android.view.View").text("您已超过今日对战次数，请明日再来。").exists() ){
+                 console.log("今日已完成30次对战，请明日再来");
+                 back(); delay(1);
+                 back(); delay(1);
+                 back(); delay(1);
+              if (id("my_display_name").exists()){//我的主页，再退一步回主页
+                back(); delay(1); } //单纯back有概率退出但又有可能只退到我的页面 故加判断
+               return;
+             }   
+              delay(3);     
+            } 
+            console.warn("第" + zNum.toString() + "轮开始...")
+         }
+     if (/*textContains("距离答题结束").exists() &&*/ !text("继续挑战").exists()){ //20201225界面变化 距离答题结束 删除
+      zsyQuestionLoop();
+        }
+    }
+}
+
+/**
+ * @description: 争上游答题 双人对战答题循环
+ * @param: null
+ * @return: null
+ */
+ //循环1 基于延时进行题目刷新做题，4+0.3秒，结束偶尔故障;20201022修改为基于前后题目判断
+function zsyQuestionLoop() {
+   
+      yc = random(form.zyc,(form.zyc+100));
+       console.info("延迟"+yc+"毫秒");
+       sleep(yc);
+    click(random(850,900),random(600,1200));
+    sleep(50);
+    click(random(750,800),random(800,1200));
+    sleep(50);
+    click(random(900,1000),random(1300,1500));
+   
+
+  
+}
+//循环2 基于上下题干进行判断题目是否已刷新 感谢ivan-cn
+function zsyQuestionLoop1() {
+    //delay(1);
+    let ClickAnswer;
+   try {
+    if (!className("RadioButton").exists() || className("android.view.View").text("继续挑战").exists() || textContains("继续挑战").exists() /*|| !textContains("距离答题结束").exists()*/){//不存在本局结束标志 继续挑战，则执行  
+    /* console.info("答题结束!");*/
+      return;
+    } else {
+        while (!className("RadioButton").exists());//@KB64ba建议使用while判断
+        if (className("RadioButton").exists() || aquestion.length == 0) {
+            var aquestion = className("ListView").findOnce().parent().child(0).text();
+            var question = aquestion.substring(3); //争上游和对战题目前带1.2.3.需去除
+            //找题目，防出错      
+            while (aquestion == oldaquestion || question == "") {
+                delay(0.8);
+                if (!className("RadioButton").exists() || className("android.view.View").text("继续挑战").exists() || textContains("继续挑战").exists()) {	
+                    console.info("答题结束!");
+                    return;
+                }
+                //找题目 
+                aquestion = className("ListView").findOnce().parent().child(0).text();
+                question = aquestion.substring(3);
+            }
+            //           
+        } else {
+            console.error("提取题目失败!");
+            let listArray = className("ListView").findOnce().children();//题目选项列表
+            let i = random(0, listArray.length - 1);
+            console.log("随机点击");
+            listArray[i].child(0).click();//随意点击一个答案
+            return;
+        }
+        var chutiIndex = question.lastIndexOf("出题单位");//@chongyadong添加
+        if (chutiIndex != -1) {
+            question = question.substring(0, chutiIndex - 2);
+        }
+        question = question.replace(/\s/g, "");
+        yc = random(form.zyc,(form.zyc+100));
+        console.info("延迟"+yc+"毫秒")
+        sleep(yc);
+        var options = [];//选项列表
+        if (className("RadioButton").exists()) {
+            className("ListView").findOne().children().forEach(child => {
+                var answer_q = child.child(0).child(1).text();
+                options.push(answer_q);
+            });
+        } else {
+            console.error("答案获取失败!");
+            return;
+        }
+        //
+        if (aquestion != oldaquestion) {
+            reg = /.*择词语的正确.*/g // 正则判断是否为字形
+            if (reg.test(question)) {
+                //log(options)
+                var optionStr = options;
+                for (i in optionStr) {//替换搜索用的数组
+                    optionStr[i] = options[i].substring(3);
+                }
+                var optionStr = options.join("");
+                question = question + optionStr;//Ivan-cn原版代码，会造成搜题失败，不掐头去尾正确率更高 后续：该部分应当配合题库使用
+                /*question = question.substr(1);//开头删除一个字
+                question = question.substr(0, question.length - 1);//结尾删除一个字，增加搜索的准确率
+            } else {
+                question = question.substr(1);//开头删除一个字
+                question = question.substr(0, question.length - 1);*/ //结尾删除一个字，增加搜索的准确率
+            }
+            console.log(aquestion.substring(0, 2) + "题目:" + question);
+             if (question == ZiXingTi.replace(/\s/g, "") || question == DuYinTi.replace(/\s/g, "")|| question == ErShiSiShi.replace(/\s/g, "")) {
+                question = question + options[0].substring(3); //字形题 读音题 在题目后面添加第一选项，选项带A.去除               
+                }
+            var answer = getAnswer(question, 'tiku');
+            if (answer.length == 0) {//tiku表中没有则到tikuNet表中搜索答案
+                answer = getAnswer(question, 'tikuNet');
+            }
+            console.info("答案：" + answer);
+            if (/^[a-zA-Z]{1}$/.test(answer)) {//如果为ABCD形式
+                var indexAnsTiku = indexFromChar(answer.toUpperCase());
+                answer = options[indexAnsTiku];
+                toastLog("answer from char=" + answer);
+            }
+            let hasClicked = false;
+            let listArray = className("ListView").findOnce().children();//题目选项列表
+            /* if (answer == "")*/ //如果没找到答案
+            if (answer.length == 0) {
+                let i = random(0, listArray.length - 1);
+                console.error("没有找到答案，随机点击");
+                listArray[i].child(0).click();//随意点击一个答案
+                hasClicked = true;
+                ClickAnswer = listArray[i].child(0).child(1).text();;//记录已点击答案
+                console.log("随机点击:"+ClickAnswer);
+                console.log("---------------------------");
+            }
+            else//如果找到了答案
+            {   //该部分问题: 选项带A.B.C.D.，题库返回答案不带，char返回答案带
+                var answer_a = answer.substring(0, 2);//定义answer_a，获取答案前两个字符对比A.B.C.D.应该不会出现E选项
+                if (answer_a == "A." || answer_a == "B." || answer_a == "C." || answer_a == "D.") {
+                    listArray.forEach(item => {
+                        var listDescStrb = item.child(0).child(1).text();
+                        if (listDescStrb == answer) {
+                            item.child(0).click();//点击答案
+                            hasClicked = true;
+                            console.log("---------------------------");
+                        }
+                    });
+                } else {
+                    listArray.forEach(item => {
+                        var listDescStra = item.child(0).child(1).text();
+                        var listDescStrb = listDescStra.substring(3);//选项去除A.B.C.D.再与answer对比
+                        if (listDescStrb == answer) {
+                            item.child(0).click();//点击答案
+                            hasClicked = true;
+                            console.log("---------------------------");
+                        }
+                    });
+                }
+            }
+            if (!hasClicked)//如果没有点击成功
+            {
+                console.error("未能成功点击，随机点击");
+                let i = random(0, listArray.length - 1);
+                listArray[i].child(0).click();//随意点击一个答案
+                console.log("---------------------------");
+            }
+        }
+        //旧题目
+        oldaquestion = aquestion;
+        delay(1);
+    }
+   }catch (e){
+     delay(3);
+   if (!className("RadioButton").exists() || className("android.view.View").text("继续挑战").exists() || textContains("继续挑战").exists() /*|| !textContains("距离答题结束").exists()*/){//不存在本局结束标志 继续挑战，则执行  
+     /*console.info("答题结束!");*/ //配合20201225界面变化 距离答题结束 删除，本语句删除
+     return;
+    }  
+  }  
+}
+
+
+
+
+/**
+ * @description: 获取填空题题目数组
+ * @param: null
+ * @return: questionArray
+ */
+function getFitbQuestion() {
+    var questionCollections = className("EditText").findOnce().parent().parent();
+    var questionArray = [];
+    var findBlank = false;
+    var blankCount = 0;
+    var blankNumStr = "";
+    var i = 0;
+    questionCollections.children().forEach(item => {
+        if (item.className() != "android.widget.EditText") {
+            if (item.text() != "") {//题目段
+                if (findBlank) {
+                    blankNumStr = "|" + blankCount.toString();
+                    questionArray.push(blankNumStr);
+                    findBlank = false;
+                }
+                questionArray.push(item.text());
+            } else {
+                findBlank = true;
+                /*blankCount += 1;*/
+                blankCount = (className("EditText").findOnce(i).parent().childCount() -1);
+                i++;
+            }
+        }
+    });
+    return questionArray;
+}
+
+
+/**
+ * @description: 获取选择题题目数组
+ * @param: null
+ * @return: questionArray
+ */
+function getChoiceQuestion() {
+    var questionCollections = className("ListView").findOnce().parent().child(1);
+    var questionArray = [];
+    questionArray.push(questionCollections.text());
+    return questionArray;
+}
+
+
+/**
+ * @description: 获取提示字符串
+ * @param: null
+ * @return: tipsStr
+ */
+function getTipsStr() {
+    var tipsStr = "";
+    while (tipsStr == "") {
+        if (text("查看提示").exists()) {
+            var seeTips = text("查看提示").findOnce();
+            seeTips.click();
+            delay(1);
+            click(device.width * 0.5, device.height * 0.41);
+            delay(1);
+            click(device.width * 0.5, device.height * 0.35);
+        } else {
+            console.error("未找到查看提示");
+        }
+        if (text("提示").exists()) {
+            var tipsLine = text("提示").findOnce().parent();
+            //获取提示内容
+            var tipsView = tipsLine.parent().child(1).child(0);
+            tipsStr = tipsView.text();
+            //关闭提示
+            tipsLine.child(1).click();
+            break;
+        }
+        delay(1);
+    }
+    return tipsStr;
+}
+
+
+/**
+ * @description: 从提示中获取填空题答案
+ * @param: questionArray, tipsStr
+ * @return: ansTips
+ */
+function getAnswerFromTips(questionArray, tipsStr) {
+    var ansTips = "";
+    for (var i = 1; i < questionArray.length -1; i++) {
+        if (questionArray[i].charAt(0) == "|") {
+            var blankLen = questionArray[i].substring(1);
+            var indexKey = tipsStr.indexOf(questionArray[i + 1]); 
+            var ansFind = tipsStr.substr(indexKey - blankLen, blankLen);
+            /*ansTips += ansFind;*/
+            ansTips = ansTips.concat(ansFind);
+        }
+    }
+    return ansTips;
+}
+
+/**
+ * @description: 根据提示点击选择题选项
+ * @param: tipsStr
+ * @return: clickStr
+ */
+function clickByTips(tipsStr) {
+    var clickStr = "";
+    let isFind = false;
+    if (className("ListView").exists()) {
+        var listArray = className("ListView").findOne().children();
+        listArray.forEach(item => {
+            var ansStr = item.child(0).child(2).text();
+            if (tipsStr.indexOf(ansStr) >= 0) {
+                item.child(0).click();
+                clickStr += item.child(0).child(1).text().charAt(0);
+                isFind = true;
+            }
+        });
+        if (!isFind) { //没有找到 点击第一个
+            listArray[0].child(0).click();
+            clickStr += listArray[0].child(0).child(1).text().charAt(0);
+        }
+    }
+    return clickStr;
+}
+
+
+/**
+ * @description: 根据答案点击选择题选项
+ * @param: answer
+ * @return: null
+ */
+function clickByAnswer(answer) {
+    let isFind = false;
+    if (className("ListView").exists()) {
+        var listArray = className("ListView").findOnce().children();
+        listArray.forEach(item => {
+            var listIndexStr = item.child(0).child(1).text().charAt(0);
+            //单选答案为非ABCD
+            var listDescStr = item.child(0).child(2).text();
+            if (answer.indexOf(listIndexStr) >= 0 || answer == listDescStr) {
+                item.child(0).click();
+                isFind = true;
+            }
+        });
+     if (!isFind) { //找到答案 点击失败 点击第一个
+            listArray[0].child(0).click();
+         }
+    }
+}
+
+/*************************************************题库操作部分***************************************************/
+
+function indexFromChar(str) {
+    return str.charCodeAt(0) - "A".charCodeAt(0);
+}
+
+/**
+ * @description: 检查答案是否正确，并更新数据库
+ * @param: question, ansTiku, answer
+ * @return: null
+ */
+function checkAndUpdate(question, ansTiku, answer) {
+    if (className("Button").desc("下一题").exists() || className("Button").desc("完成").exists()) {//答错了
+        swipe(100, device.height - 100, 100, 100, 500);
+        var nCout = 0
+        while (nCout < 5) {
+            if (descStartsWith("正确答案").exists()) {
+                var correctAns = descStartsWith("正确答案").findOnce().desc().substr(5);
+                console.info("正确答案是：" + correctAns);
+                if (ansTiku == "") { //题库为空则插入正确答案                
+                    var sql = "INSERT INTO tiku VALUES ('" + question + "','" + correctAns + "','')";
+                } else { //更新题库答案
+                    var sql = "UPDATE tiku SET answer='" + correctAns + "' WHERE question LIKE '" + question + "'";
+                }
+                insertOrUpdate(sql);
+                console.log("更新题库答案...");
+                delay(1);
+                break;
+            } else {
+                var clickPos = className("android.webkit.WebView").findOnce().child(2).child(0).child(1).bounds();
+                click(clickPos.left + device.width * 0.13, clickPos.top + device.height * 0.1);
+                console.error("未捕获正确答案，尝试修正");
+            }
+            nCout++;
+        }
+        if (className("Button").exists()) {
+            className("Button").findOnce().click();
+        } else {
+            click(device.width * 0.85, device.height * 0.06);
+        }
+    } else { //正确后进入下一题，或者进入再来一局界面
+        if (ansTiku == "" && answer != "") { //正确进入下一题，且题库答案为空              
+            var sql = "INSERT INTO tiku VALUES ('" + question + "','" + answer + "','')";
+            insertOrUpdate(sql);
+            console.log("更新题库答案...");
+        }
+    }
+}
+
+/**
+ * @description: 判断题库是否存在
+ * @param: null
+ * @return: null
+ */
+function judge_tiku_existence() {
+    var dbName = "tiku.db";//题库文件名
+    var path = files.path(dbName);
+    if (!files.exists(path)) {
+        //files.createWithDirs(path);
+        console.error("未找到题库！请将题库文件放置与js文件同一目录下再运行！");
+        return false;
+    }
+    var db = SQLiteDatabase.openOrCreateDatabase(path, null);
+    var createTable = "\
+    CREATE TABLE IF NOT EXISTS tikuNet(\
+    question CHAR(253),\
+    answer CHAR(100)\
+    );";
+    db.execSQL(createTable);
+    return true;
+}
+
+/**
+ * @description: 从数据库中搜索答案
+ * @param: question 问题
+ * @return: answer 答案
+ */
+function getAnswer(question, table_name) {
+    var dbName = "tiku.db";//题库文件名
+    var path = files.path(dbName);
+
+    var db = SQLiteDatabase.openOrCreateDatabase(path, null);
+
+    sql = "SELECT answer FROM " + table_name + " WHERE question LIKE '" + question + "%'"
+    var cursor = db.rawQuery(sql, null);
+    if (cursor.moveToFirst()) {
+        var answer = cursor.getString(0);
+        cursor.close();
+        return answer;
+    }
+    else {
+        console.error("题库中未找到答案");
+        cursor.close();
+        return '';
+    }
+}
+
+/**
+ * @description: 增加或更新数据库
+ * @param: sql
+ * @return: null
+ */
+function insertOrUpdate(sql) {
+    var dbName = "tiku.db";
+    var path = files.path(dbName);
+    if (!files.exists(path)) {
+        //files.createWithDirs(path);
+        console.error("未找到题库!请将题库放置与js同一目录下");
+    }
+    var db = SQLiteDatabase.openOrCreateDatabase(path, null);
+    db.execSQL(sql);
+    db.close();
+}
+
+/*************************************************更新题库部分***************************************************/
+/**
+ * @description: 更新数据库tikuNet表
+ * @param  {} liArray li列表，包含题目和答案
+ */
+
+/**
+ * @description: 在线更新题库
+ * @param: null
+ * @return: null
+ */
+function updateTikunet() {
+    console.log("开始下载题库json数据...");
+    var htmlString = Jsoup.connect("https://qg.zyqq.top/tiku/").maxBodySize(0).timeout(10000).get();
+    var htmlArray = Jsoup.parse(htmlString);
+    var liArray = htmlArray.select("li:has(b)");
+    console.log('题库下载完毕，', util.format("题目总数：%s"), liArray.size());
+    //执行更新
+    console.log("开始更新数据库...");
+     if (CreateAndInsert(liArray)) {
+        log("数据库更新完毕！");
+        log(util.format("题库下载完毕，题目总数:%s"), liArray.size());
+        return liArray.size();
+    } else {
+        return -1;
+    }
+}
+
+/**
+ * @description: 本地更新题库
+ * @param: null
+ * @return: null
+ */
+function CreateAndInsert(liArray) {
+    var dbName = "tiku.db";//题库文件名
+    var path = files.path(dbName);
+    //确保文件存在，若题库不存在则创建一个空db文件
+    if (!files.exists(path)) {
+        files.createWithDirs(path);
+    }
+    //创建或打开数据库
+    var db = SQLiteDatabase.openOrCreateDatabase(path, null);
+    var createTable = "\
+    CREATE TABLE IF NOT EXISTS tikuNet(\
+    question CHAR(253),\
+    answer CHAR(100)\
+    );";
+    var cleanTable = "DELETE FROM tikuNet";
+    db.execSQL(createTable);
+    db.execSQL(cleanTable);
+    console.log("创建打开清空表tikuNet!");
+    var sql = "INSERT INTO tikuNet (question, answer) VALUES (?, ?)";
+    db.beginTransaction();
+    var stmt = db.compileStatement(sql);
+    for (var li = 0, len = liArray.size(); li < len; li++) {
+        var liText = liArray.get(li).text();
+        var timuPos = liText.indexOf("】") + 1;
+        var tiMu = liText.substring(timuPos).replace(/_/g, "");
+        var daAn = liArray.get(li).select("b").first().text();
+        console.log(util.format("题目:%s\n答案:%s"), tiMu, daAn);
+        stmt.bindString(1, tiMu);
+        stmt.bindString(2, daAn);
+        stmt.executeInsert();
+        stmt.clearBindings();
+    }
+    db.setTransactionSuccessful();
+    db.endTransaction();
+    db.close();
+    return true;
+}
+function entry_model(number) {
+  sleep(200);
+  var model = className('android.view.View').depth(22).findOnce(number);
+  while (!model.child(3).click());
+}
+
+// 模拟点击可点击元素
+function my_click_clickable(target) {
+  text(target).waitFor();
+  // 防止点到页面中其他有包含“我的”的控件，比如搜索栏
+  if (target == '我的') {
+    id("comm_head_xuexi_mine").findOne().click();
+  } else {
+    click(target);
+  }
+}
+
+/**
+ * 答题
+ * @param {int} depth_option 选项控件的深度
+ * @param {string} question 问题
+ */
+function do_contest_answer(depth_option, question) {
+  if (question == "选择正确的读音" || question == "选择词语的正确词形" || question == "下列词形正确的是") {
+    // 选择第一个
+    className('android.widget.RadioButton').depth(32).waitFor();
+    className('android.widget.RadioButton').depth(depth_option).findOne().click();
+  } else {
+    var result;
+    // 发送http请求获取答案 网站搜题速度 r1 > r2
+    try {
+      var r1 = http.get('http://www.syiban.com/search/index/init.html?modelid=1&q=' + encodeURI(question.slice(0, 10)));
+      result = r1.body.string().match(/答案：./);
+    } catch (error) {
+    }
+    // 如果第一个网站没获取到正确答案，则利用第二个网站
+    if (!(result && result[0].charCodeAt(3) > 64 && result[0].charCodeAt(3) < 69)) {
+      try {
+        var r2 = http.get('https://www.souwen123.com/search/select.php?age=' + encodeURI(question));
+        result = r2.body.string().match(/答案：./);
+      } catch (error) {
+      }
+    }
+
+    className('android.widget.RadioButton').depth(32).waitFor();
+
+    if (result) {
+      try {
+        className('android.widget.RadioButton').depth(depth_option).findOnce(result[0].charCodeAt(3) - 65).click();
+      } catch (error) {
+        // 如果选项不存在，则点击第一个
+        className('android.widget.RadioButton').depth(depth_option).findOne().click();
+      }
+    } else {
+      // 如果没找到结果则选择第一个
+      className('android.widget.RadioButton').depth(depth_option).findOne().click();
+    }
+  }
+}
+
+/**
+ * @param {image} img 传入图片
+ */
+
+/**
+* 获取用户token
+*/
+function get_baidu_token() {
+  var res = http.post(
+    'https://aip.baidubce.com/oauth/2.0/token',
+    {
+      grant_type: 'client_credentials',
+      client_id: 'fYY1brKBIftrtmucsfUfOuG6',
+      client_secret: 'ywGpqtWsdZ6oBIyeQrZbbqXYWVVO763B',
+    }
+  );
+  return res.body.json()['access_token'];
+}
+
+var token = get_baidu_token();
+
+/**
+* 百度ocr接口，传入图片返回文字
+* @param {image} img 传入图片
+* @returns {string} answer 文字
+*/
+function baidu_ocr_api(img) {
+  var right_flag = false;
+  var answer_left = "";
+  var answer_right = "";
+  var answer = "";
+  var res = http.post(
+    'https://aip.baidubce.com/rest/2.0/ocr/v1/general',
+    {
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      access_token: token,
+      image: images.toBase64(img),
+    }
+  );
+  var res = res.body.json();
+  try {
+    var words_list = res.words_result;
+  } catch (error) {
+  }
+  if (words_list) {
+    for (var i in words_list) {
+      // 如果是选项则后面不需要读取
+      if (words_list[i].words[0] == "A") break;
+      // 将题目以分割线分为两块
+      // 利用location之差判断是否之中有分割线
+      /**
+       * location:
+       * 识别到的文字块的区域位置信息，列表形式，
+       * location['left']表示定位位置的长方形左上顶点的水平坐标
+       * location['top']表示定位位置的长方形左上顶点的垂直坐标
+       */
+      if (words_list[0].words.indexOf('.') != -1 && i > 0 &&
+        Math.abs(words_list[i].location['left'] -
+          words_list[i - 1].location['left']) > 100) right_flag = true;
+      if (right_flag) answer_right += words_list[i].words;
+      else answer_left += words_list[i].words;
+      if (answer_left.length >= 20 || answer_right.length >= 20) break;
+    }
+  }
+  answer = answer_right.length > answer_left.length ? answer_right : answer_left;
+  answer = answer.replace(/\s*/g, "");
+  answer = answer.replace(/,/g, "，");
+  answer = answer.slice(answer.indexOf('.') + 1);
+  answer = answer.slice(0, 20);
+  return answer;
+}
+
+function do_it() {
+  while (!text('开始').exists());
+  while (!text('继续挑战').exists()) {
+    className("android.view.View").depth(28).waitFor();
+    var pos = className("android.view.View").depth(28).findOne().bounds();
+    if (className("android.view.View").text("        ").exists())
+      pos = className("android.view.View").text("        ").findOne().bounds();
+    do {
+      var point = findColor(captureScreen(), '#1B1F25', {
+        region: [pos.left, pos.top, pos.width(), pos.height()],
+        threshold: 10,
+      });
+    } while (!point);
+
+      var img = images.inRange(captureScreen(), '#000000', '#444444');
+      img = images.clip(img, pos.left, pos.top, pos.width(), pos.height());
+    
+
+  var question = baidu_ocr_api(img);
+    log(question);
+    if (question) do_contest_answer(32, question);
+    else {
+      className('android.widget.RadioButton').depth(32).waitFor();
+      className('android.widget.RadioButton').depth(32).findOne().click();
+    }
+    // 等待新题目加载
+    while (!textMatches(/第\d题/).exists() && !text('继续挑战').exists() && !text('开始').exists());
+  }
+}
+
+module.exports = main;
