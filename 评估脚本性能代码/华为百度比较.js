@@ -19,7 +19,7 @@ var { projectId } = hamibot.env;
 var { AK } = hamibot.env;
 var { SK } = hamibot.env;
 
-if (whether_improve_accuracy == 'yes' && !password && !AK) {
+if (whether_improve_accuracy == 'yes' && (!password || !AK)) {
   toast("如果你选择了增强版，请配置信息，具体看脚本说明");
   exit();
 }
@@ -188,7 +188,7 @@ function get_huawei_token() {
   return res.headers['X-Subject-Token'];
 }
 
-if (whether_improve_accuracy == 'yes' && baidu_or_huawei == 'huawei') var token = get_huawei_token();
+if (whether_improve_accuracy == 'yes') var huawei_token = get_huawei_token();
 
 /**
 * 华为ocr接口，传入图片返回文字
@@ -208,7 +208,7 @@ function huawei_ocr_api(img) {
     {
       headers: {
         "User-Agent": "API Explorer",
-        "X-Auth-Token": token,
+        "X-Auth-Token": huawei_token,
         "Content-Type": "application/json;charset=UTF-8"
       }
     }
@@ -266,7 +266,7 @@ function get_baidu_token() {
   return res.body.json()['access_token'];
 }
 
-if (whether_improve_accuracy == 'yes' && baidu_or_huawei == 'baidu') var token = get_baidu_token();
+if (whether_improve_accuracy == 'yes') var baidu_token = get_baidu_token();
 
 /**
 * 百度ocr接口，传入图片返回文字
@@ -284,7 +284,7 @@ function baidu_ocr_api(img) {
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded'
       },
-      access_token: token,
+      access_token: baidu_token,
       image: images.toBase64(img),
     }
   );
@@ -349,12 +349,20 @@ function do_it() {
     }
 
     if (whether_improve_accuracy == 'yes') {
-      if (baidu_or_huawei == 'huawei') var question = huawei_ocr_api(img);
-      else var question = baidu_ocr_api(img);
+      var beginTime = +new Date();
+      var question = huawei_ocr_api(img);
+      var endTime = +new Date();
+      log("华为用时" + (endTime - beginTime) + "ms");
+      log("华为识别结果" + question);
+
+      var beginTime = +new Date();
+      var question = baidu_ocr_api(img);
+      var endTime = +new Date();
+      log("百度用时" + (endTime - beginTime) + "ms");
+      log("百度识别结果" + question);
     }
     else var question = ocr_api(img);
 
-    log(question);
     if (question) do_contest_answer(32, question);
     else {
       className('android.widget.RadioButton').depth(32).waitFor();
